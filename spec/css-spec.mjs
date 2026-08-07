@@ -3864,4 +3864,247 @@ describe('CSS grammar', function () {
 			assert.deepStrictEqual(tokens[22], { scopes: ['source.css', 'meta.property-list.css', 'meta.property-value.css', 'meta.function.misc.css', 'punctuation.section.function.end.bracket.round.css'], value: ')' });
 		});
 	});
+
+	describe('modern CSS at-rules', function () {
+		it('tokenizes @container with a container name', function () {
+			var tokens;
+			tokens = testGrammar.tokenizeLine('@container card (min-width: 400px) { .x { color: red; } }').tokens;
+			assert.deepStrictEqual(tokens[0], { scopes: ['source.css', 'meta.at-rule.container.header.css', 'keyword.control.at-rule.container.css', 'punctuation.definition.keyword.css'], value: '@' });
+			assert.deepStrictEqual(tokens[1], { scopes: ['source.css', 'meta.at-rule.container.header.css', 'keyword.control.at-rule.container.css'], value: 'container' });
+			assert.deepStrictEqual(tokens[3], { scopes: ['source.css', 'meta.at-rule.container.header.css', 'variable.parameter.container-name.css'], value: 'card' });
+			assert.deepStrictEqual(tokens[5], { scopes: ['source.css', 'meta.at-rule.container.header.css', 'punctuation.definition.parameters.begin.bracket.round.css'], value: '(' });
+			assert.deepStrictEqual(tokens[6], { scopes: ['source.css', 'meta.at-rule.container.header.css', 'support.type.property-name.container.css'], value: 'min-width' });
+		});
+
+		it('tokenizes @container logical operators', function () {
+			var tokens;
+			tokens = testGrammar.tokenizeLine('@container (min-width: 400px) and (max-width: 900px) {').tokens;
+			var and = tokens.find(t => t.value === 'and');
+			assert.deepStrictEqual(and.scopes, ['source.css', 'meta.at-rule.container.header.css', 'keyword.operator.logical.and.container.css']);
+		});
+
+		it('tokenizes @container style() queries', function () {
+			var tokens;
+			tokens = testGrammar.tokenizeLine('@container style(--theme: dark) {').tokens;
+			assert.deepStrictEqual(tokens[3], { scopes: ['source.css', 'meta.at-rule.container.header.css', 'meta.function.style.css', 'support.function.style.css'], value: 'style' });
+		});
+
+		it('tokenizes @container scroll-state() queries', function () {
+			var tokens = testGrammar.tokenizeLine('@container scroll-state(stuck: block-start) {').tokens;
+			assert.deepStrictEqual(tokens.find(x => x.value === 'scroll-state').scopes, ['source.css', 'meta.at-rule.container.header.css', 'meta.function.scroll-state.css', 'support.function.scroll-state.css']);
+			assert.deepStrictEqual(tokens.find(x => x.value === 'stuck').scopes, ['source.css', 'meta.at-rule.container.header.css', 'meta.function.scroll-state.css', 'support.type.property-name.container.css']);
+			assert.deepStrictEqual(tokens.find(x => x.value === 'block-start').scopes, ['source.css', 'meta.at-rule.container.header.css', 'meta.function.scroll-state.css', 'support.constant.property-value.css']);
+		});
+
+		it('tokenizes grouped @container scroll-state() conditions', function () {
+			var tokens = testGrammar.tokenizeLine('@container scroll-state((stuck: top) or (scrolled: block-start)) {').tokens;
+			assert.deepStrictEqual(tokens.find(x => x.value === 'or').scopes, ['source.css', 'meta.at-rule.container.header.css', 'meta.function.scroll-state.css', 'keyword.operator.logical.or.container.css']);
+			assert.deepStrictEqual(tokens.find(x => x.value === 'scrolled').scopes, ['source.css', 'meta.at-rule.container.header.css', 'meta.function.scroll-state.css', 'support.type.property-name.container.css']);
+			assert.deepStrictEqual(tokens.find(x => x.value === 'block-start').scopes, ['source.css', 'meta.at-rule.container.header.css', 'meta.function.scroll-state.css', 'support.constant.property-value.css']);
+		});
+
+		it('recovers from semicolon-terminated block at-rules', function () {
+			[
+				'@container (width > 1px);',
+				'@scope (.x);',
+				'@starting-style ;',
+				'@property --theme;'
+			].forEach(function (atRule) {
+				var lines = testGrammar.tokenizeLines(atRule + '\n.after { color: red; }');
+				assert.deepStrictEqual(lines[1].find(x => x.value === 'after').scopes, ['source.css', 'meta.selector.css', 'entity.other.attribute-name.class.css'], atRule);
+			});
+		});
+
+		it('tokenizes @scope preludes as selectors', function () {
+			var tokens;
+			tokens = testGrammar.tokenizeLine('@scope (.a) to (.b) {').tokens;
+			assert.deepStrictEqual(tokens[1], { scopes: ['source.css', 'meta.at-rule.scope.header.css', 'keyword.control.at-rule.scope.css'], value: 'scope' });
+			assert.deepStrictEqual(tokens[4], { scopes: ['source.css', 'meta.at-rule.scope.header.css', 'meta.scope.limit.css', 'entity.other.attribute-name.class.css', 'punctuation.definition.entity.css'], value: '.' });
+			assert.deepStrictEqual(tokens[5], { scopes: ['source.css', 'meta.at-rule.scope.header.css', 'meta.scope.limit.css', 'entity.other.attribute-name.class.css'], value: 'a' });
+			var to = tokens.find(t => t.value === 'to');
+			assert.deepStrictEqual(to.scopes, ['source.css', 'meta.at-rule.scope.header.css', 'keyword.operator.logical.scope.css']);
+		});
+
+		it('tokenizes @starting-style', function () {
+			var tokens;
+			tokens = testGrammar.tokenizeLine('@starting-style { .z { opacity: 0; } }').tokens;
+			assert.deepStrictEqual(tokens[1], { scopes: ['source.css', 'meta.at-rule.starting-style.header.css', 'keyword.control.at-rule.starting-style.css'], value: 'starting-style' });
+		});
+
+		it('tokenizes @property without corrupting the rest of the document', function () {
+			var lines;
+			lines = testGrammar.tokenizeLines('@property --my-color {\n  syntax: "<color>";\n  inherits: false;\n}\n.after { color: red; }');
+			assert.deepStrictEqual(lines[0][1], { scopes: ['source.css', 'meta.at-rule.property.header.css', 'keyword.control.at-rule.property.css'], value: 'property' });
+			assert.deepStrictEqual(lines[0][3], { scopes: ['source.css', 'meta.at-rule.property.header.css', 'variable.css'], value: '--my-color' });
+			assert.deepStrictEqual(lines[1][1], { scopes: ['source.css', 'meta.at-rule.property.body.css', 'meta.property-name.css', 'support.type.property-name.css'], value: 'syntax' });
+			assert.deepStrictEqual(lines[2][1], { scopes: ['source.css', 'meta.at-rule.property.body.css', 'meta.property-name.css', 'support.type.property-name.css'], value: 'inherits' });
+			// The `>` inside the syntax string must not be treated as a combinator,
+			// and the following rule must tokenize as a normal selector.
+			assert.deepStrictEqual(lines[4][0], { scopes: ['source.css', 'meta.selector.css', 'entity.other.attribute-name.class.css', 'punctuation.definition.entity.css'], value: '.' });
+			assert.deepStrictEqual(lines[4][1], { scopes: ['source.css', 'meta.selector.css', 'entity.other.attribute-name.class.css'], value: 'after' });
+		});
+	});
+
+	describe('modern CSS functions', function () {
+		it('tokenizes light-dark() as a color function', function () {
+			var tokens;
+			tokens = testGrammar.tokenizeLine('a { color: light-dark(white, black); }').tokens;
+			var fn = tokens.find(t => t.value === 'light-dark');
+			assert.deepStrictEqual(fn.scopes, ['source.css', 'meta.property-list.css', 'meta.property-value.css', 'meta.function.color.css', 'support.function.misc.css']);
+		});
+
+		it('tokenizes color-mix() as a color function', function () {
+			var tokens;
+			tokens = testGrammar.tokenizeLine('a { color: color-mix(in oklch, red, blue); }').tokens;
+			var fn = tokens.find(t => t.value === 'color-mix');
+			assert.deepStrictEqual(fn.scopes, ['source.css', 'meta.property-list.css', 'meta.property-value.css', 'meta.function.color.css', 'support.function.misc.css']);
+		});
+
+		it('tokenizes color-mix() interpolation keywords', function () {
+			var tokens;
+			tokens = testGrammar.tokenizeLine('a { color: color-mix(in oklch longer hue, red 40%, blue); }').tokens;
+			// `in`, the colorspace and the hue-interpolation method are not property
+			// values, so they need their own scope rather than falling through unscoped.
+			assert.deepStrictEqual(tokens.find(t => t.value === 'in').scopes, ['source.css', 'meta.property-list.css', 'meta.property-value.css', 'meta.function.color.css', 'variable.parameter.misc.css']);
+			assert.deepStrictEqual(tokens.find(t => t.value === 'oklch').scopes, ['source.css', 'meta.property-list.css', 'meta.property-value.css', 'meta.function.color.css', 'variable.parameter.misc.css']);
+			assert.deepStrictEqual(tokens.find(t => t.value === 'longer').scopes, ['source.css', 'meta.property-list.css', 'meta.property-value.css', 'meta.function.color.css', 'variable.parameter.misc.css']);
+			assert.deepStrictEqual(tokens.find(t => t.value === 'red').scopes, ['source.css', 'meta.property-list.css', 'meta.property-value.css', 'meta.function.color.css', 'support.constant.color.w3c-standard-color-name.css']);
+		});
+
+		it('does not scope the slash separator inside color functions', function () {
+			var tokens;
+			tokens = testGrammar.tokenizeLine('a { color: rgb(0 0 0 / 50%); }').tokens;
+			var slash = tokens.find(t => t.value.trim() === '/');
+			assert.deepStrictEqual(slash.scopes, ['source.css', 'meta.property-list.css', 'meta.property-value.css', 'meta.function.color.css']);
+		});
+
+		it('tokenizes env() with a known environment variable', function () {
+			var tokens;
+			tokens = testGrammar.tokenizeLine('a { padding: env(safe-area-inset-top); }').tokens;
+			var fn = tokens.find(t => t.value === 'env');
+			assert.deepStrictEqual(fn.scopes, ['source.css', 'meta.property-list.css', 'meta.property-value.css', 'meta.function.env.css', 'support.function.misc.css']);
+			var arg = tokens.find(t => t.value === 'safe-area-inset-top');
+			assert.deepStrictEqual(arg.scopes, ['source.css', 'meta.property-list.css', 'meta.property-value.css', 'meta.function.env.css', 'support.constant.property-value.css']);
+		});
+
+		it('tokenizes anchor() and anchor-size()', function () {
+			var tokens;
+			tokens = testGrammar.tokenizeLine('a { top: anchor(--x bottom); }').tokens;
+			var fn = tokens.find(t => t.value === 'anchor');
+			assert.deepStrictEqual(fn.scopes, ['source.css', 'meta.property-list.css', 'meta.property-value.css', 'meta.function.anchor.css', 'support.function.misc.css']);
+			var arg = tokens.find(t => t.value === '--x');
+			assert.deepStrictEqual(arg.scopes, ['source.css', 'meta.property-list.css', 'meta.property-value.css', 'meta.function.anchor.css', 'variable.argument.css']);
+
+			tokens = testGrammar.tokenizeLine('a { width: anchor-size(--x width); }').tokens;
+			var fn2 = tokens.find(t => t.value === 'anchor-size');
+			assert.deepStrictEqual(fn2.scopes, ['source.css', 'meta.property-list.css', 'meta.property-value.css', 'meta.function.anchor.css', 'support.function.misc.css']);
+		});
+
+		it('tokenizes newer math functions', function () {
+			['mod', 'rem', 'round'].forEach(function (fn) {
+				var tokens = testGrammar.tokenizeLine('a { width: ' + fn + '(10px, 3px); }').tokens;
+				var t = tokens.find(x => x.value === fn);
+				assert.deepStrictEqual(t.scopes, ['source.css', 'meta.property-list.css', 'meta.property-value.css', 'meta.function.misc.css', 'support.function.misc.css'], fn);
+			});
+		});
+	});
+
+	describe('modern CSS properties', function () {
+		it('recognises newer property names as supported', function () {
+			[
+				'anchor-name', 'position-anchor', 'position-area', 'field-sizing',
+				'view-transition-name', 'contain-intrinsic-size', 'scroll-timeline',
+				'margin-trim', 'content-visibility', 'text-wrap-style', 'interpolate-size'
+			].forEach(function (prop) {
+				var tokens = testGrammar.tokenizeLine('a { ' + prop + ': inherit; }').tokens;
+				var t = tokens.find(x => x.value === prop);
+				assert.deepStrictEqual(t.scopes, ['source.css', 'meta.property-list.css', 'meta.property-name.css', 'support.type.property-name.css'], prop);
+			});
+		});
+	});
+
+	describe('modern CSS selectors', function () {
+		it('tokenizes newer pseudo-classes', function () {
+			['popover-open', 'user-valid', 'user-invalid', 'placeholder-shown', 'autofill', 'modal', 'defined', 'open'].forEach(function (pc) {
+				var tokens = testGrammar.tokenizeLine('a:' + pc + ' {}').tokens;
+				assert.deepStrictEqual(tokens[2], { scopes: ['source.css', 'meta.selector.css', 'entity.other.attribute-name.pseudo-class.css'], value: pc });
+			});
+		});
+
+		it('tokenizes newer pseudo-elements', function () {
+			['details-content', 'file-selector-button', 'target-text', 'backdrop', 'marker'].forEach(function (pe) {
+				var tokens = testGrammar.tokenizeLine('a::' + pe + ' {}').tokens;
+				assert.deepStrictEqual(tokens[2], { scopes: ['source.css', 'meta.selector.css', 'entity.other.attribute-name.pseudo-element.css'], value: pe });
+			});
+		});
+
+		it('tokenizes ::part() and ::slotted()', function () {
+			var tokens;
+			tokens = testGrammar.tokenizeLine('a::part(btn) {}').tokens;
+			assert.deepStrictEqual(tokens[2], { scopes: ['source.css', 'meta.selector.css', 'entity.other.attribute-name.pseudo-element.css'], value: 'part' });
+			assert.deepStrictEqual(tokens[4], { scopes: ['source.css', 'meta.selector.css', 'variable.parameter.pseudo-element.css'], value: 'btn' });
+
+			tokens = testGrammar.tokenizeLine('a::slotted(.x) {}').tokens;
+			assert.deepStrictEqual(tokens[2], { scopes: ['source.css', 'meta.selector.css', 'entity.other.attribute-name.pseudo-element.css'], value: 'slotted' });
+			assert.deepStrictEqual(tokens[5], { scopes: ['source.css', 'meta.selector.css', 'entity.other.attribute-name.class.css'], value: 'x' });
+		});
+
+		it('uses the argument grammar for each functional pseudo-element', function () {
+			var tokens = testGrammar.tokenizeLine('a::part(left)::view-transition-old(*)::scroll-button(right)::scroll-button(*) {}').tokens;
+			assert.deepStrictEqual(tokens.find(x => x.value === 'left'), { scopes: ['source.css', 'meta.selector.css', 'variable.parameter.pseudo-element.css'], value: 'left' });
+			assert.deepStrictEqual(tokens.filter(x => x.value === '*').map(x => x.scopes), [
+				['source.css', 'meta.selector.css', 'entity.name.tag.wildcard.css'],
+				['source.css', 'meta.selector.css', 'entity.name.tag.wildcard.css']
+			]);
+			assert.deepStrictEqual(tokens.find(x => x.value === 'right'), { scopes: ['source.css', 'meta.selector.css', 'support.constant.property-value.css'], value: 'right' });
+
+			tokens = testGrammar.tokenizeLine('a::part(*) {}').tokens;
+			assert.deepStrictEqual(tokens.find(x => x.value === '*').scopes, ['source.css', 'meta.selector.css']);
+		});
+
+		it('tokenizes :state() with a custom identifier', function () {
+			var tokens;
+			tokens = testGrammar.tokenizeLine('a:state(loading) {}').tokens;
+			assert.deepStrictEqual(tokens[2], { scopes: ['source.css', 'meta.selector.css', 'entity.other.attribute-name.pseudo-class.css'], value: 'state' });
+			assert.deepStrictEqual(tokens[4], { scopes: ['source.css', 'meta.selector.css', 'variable.parameter.state-name.css'], value: 'loading' });
+		});
+
+		it('tokenizes functional :host() rather than the bare pseudo-class', function () {
+			var tokens;
+			tokens = testGrammar.tokenizeLine('a:host(.dark) {}').tokens;
+			var host = tokens.find(t => t.value === 'host');
+			assert.deepStrictEqual(host.scopes, ['source.css', 'meta.selector.css', 'entity.other.attribute-name.pseudo-class.css']);
+			var open = tokens.find(t => t.value === '(');
+			assert.deepStrictEqual(open.scopes, ['source.css', 'meta.selector.css', 'punctuation.section.function.begin.bracket.round.css']);
+			var cls = tokens.find(t => t.value === 'dark');
+			assert.deepStrictEqual(cls.scopes, ['source.css', 'meta.selector.css', 'entity.other.attribute-name.class.css']);
+		});
+
+		it('tokenizes the `of` clause of :nth-child()', function () {
+			var tokens;
+			tokens = testGrammar.tokenizeLine('a:nth-child(2 of .x) {}').tokens;
+			var of = tokens.find(t => t.value === 'of');
+			assert.deepStrictEqual(of.scopes, ['source.css', 'meta.selector.css', 'keyword.operator.logical.of.css']);
+			var cls = tokens.find(t => t.value === 'x');
+			assert.deepStrictEqual(cls.scopes, ['source.css', 'meta.selector.css', 'entity.other.attribute-name.class.css']);
+		});
+	});
+
+	describe('modern media features', function () {
+		it('recognises user-preference media features', function () {
+			['prefers-color-scheme', 'prefers-contrast', 'prefers-reduced-motion', 'forced-colors', 'dynamic-range'].forEach(function (mf) {
+				var tokens = testGrammar.tokenizeLine('@media (' + mf + ': none) {}').tokens;
+				var t = tokens.find(x => x.value === mf);
+				assert.deepStrictEqual(t.scopes, ['source.css', 'meta.at-rule.media.header.css', 'support.type.property-name.media.css'], mf);
+			});
+		});
+
+		it('recognises interaction media features', function () {
+			['pointer', 'any-pointer', 'hover', 'any-hover', 'update', 'scripting'].forEach(function (mf) {
+				var tokens = testGrammar.tokenizeLine('@media (' + mf + ': none) {}').tokens;
+				var t = tokens.find(x => x.value === mf);
+				assert.deepStrictEqual(t.scopes, ['source.css', 'meta.at-rule.media.header.css', 'support.type.property-name.media.css'], mf);
+			});
+		});
+	});
 });

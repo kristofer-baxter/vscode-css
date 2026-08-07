@@ -645,6 +645,214 @@
         ]
       },
       {
+        # @container
+        'begin': '(?i)(?=@container(\\s|\\(|/\\*|$))'
+        'end': '(?<=})(?!\\G)|(?=;)'
+        'patterns': [
+          {
+            'begin': '(?i)\\G(@)container'
+            'beginCaptures':
+              '0':
+                'name': 'keyword.control.at-rule.container.css'
+              '1':
+                'name': 'punctuation.definition.keyword.css'
+            'end': '(?=\\s*[{;])'
+            'name': 'meta.at-rule.container.header.css'
+            'patterns': [
+              {
+                'include': '#container-query'
+              }
+            ]
+          }
+          {
+            'begin': '{'
+            'beginCaptures':
+              '0':
+                'name': 'punctuation.section.container.begin.bracket.curly.css'
+            'end': '}'
+            'endCaptures':
+              '0':
+                'name': 'punctuation.section.container.end.bracket.curly.css'
+            'name': 'meta.at-rule.container.body.css'
+            'patterns': [
+              {
+                'include': '#rule-list-innards'
+              }
+              {
+                'include': '$self'
+              }
+            ]
+          }
+        ]
+      }
+      {
+        # @scope
+        'begin': '(?i)(?=@scope([\\s({]|/\\*|$))'
+        'end': '(?<=})(?!\\G)|(?=;)'
+        'patterns': [
+          {
+            'begin': '(?i)\\G(@)scope'
+            'beginCaptures':
+              '0':
+                'name': 'keyword.control.at-rule.scope.css'
+              '1':
+                'name': 'punctuation.definition.keyword.css'
+            'end': '(?=\\s*[{;])'
+            'name': 'meta.at-rule.scope.header.css'
+            'patterns': [
+              {
+                'include': '#comment-block'
+              }
+              {
+                'match': '(?i)(?<=\\s|^|\\)|\\*/)to(?=\\s|\\(|/\\*|$)'
+                'name': 'keyword.operator.logical.scope.css'
+              }
+              {
+                'begin': '\\('
+                'beginCaptures':
+                  '0':
+                    'name': 'punctuation.definition.parameters.begin.bracket.round.css'
+                'end': '\\)'
+                'endCaptures':
+                  '0':
+                    'name': 'punctuation.definition.parameters.end.bracket.round.css'
+                'name': 'meta.scope.limit.css'
+                'patterns': [
+                  {
+                    'include': '#selector-innards'
+                  }
+                ]
+              }
+            ]
+          }
+          {
+            'begin': '{'
+            'beginCaptures':
+              '0':
+                'name': 'punctuation.section.scope.begin.bracket.curly.css'
+            'end': '}'
+            'endCaptures':
+              '0':
+                'name': 'punctuation.section.scope.end.bracket.curly.css'
+            'name': 'meta.at-rule.scope.body.css'
+            'patterns': [
+              {
+                'include': '#rule-list-innards'
+              }
+              {
+                'include': '$self'
+              }
+            ]
+          }
+        ]
+      }
+      {
+        # @starting-style
+        'begin': '(?i)(?=@starting-style([\\s{]|/\\*|$))'
+        'end': '(?<=})(?!\\G)|(?=;)'
+        'patterns': [
+          {
+            'begin': '(?i)\\G(@)starting-style'
+            'beginCaptures':
+              '0':
+                'name': 'keyword.control.at-rule.starting-style.css'
+              '1':
+                'name': 'punctuation.definition.keyword.css'
+            'end': '(?=\\s*[{;])'
+            'name': 'meta.at-rule.starting-style.header.css'
+            'patterns': [
+              {
+                'include': '#comment-block'
+              }
+            ]
+          }
+          {
+            'begin': '{'
+            'beginCaptures':
+              '0':
+                'name': 'punctuation.section.starting-style.begin.bracket.curly.css'
+            'end': '}'
+            'endCaptures':
+              '0':
+                'name': 'punctuation.section.starting-style.end.bracket.curly.css'
+            'name': 'meta.at-rule.starting-style.body.css'
+            'patterns': [
+              {
+                'include': '#rule-list-innards'
+              }
+              {
+                'include': '$self'
+              }
+            ]
+          }
+        ]
+      }
+      {
+        # @property
+        'begin': '(?i)(?=@property([\\s{]|/\\*|$))'
+        'end': '(?<=})(?!\\G)|(?=;)'
+        'patterns': [
+          {
+            'begin': '(?i)\\G(@)property'
+            'beginCaptures':
+              '0':
+                'name': 'keyword.control.at-rule.property.css'
+              '1':
+                'name': 'punctuation.definition.keyword.css'
+            'end': '(?=\\s*[{;])'
+            'name': 'meta.at-rule.property.header.css'
+            'patterns': [
+              {
+                'include': '#comment-block'
+              }
+              {
+                'captures':
+                  '0':
+                    'patterns': [
+                      {
+                        'include': '#escapes'
+                      }
+                    ]
+                'match': '''(?x) (?<![\\w-])
+                  --
+                  (?:[-a-zA-Z_]    | [^\\x00-\\x7F])     # First letter
+                  (?:[-a-zA-Z0-9_] | [^\\x00-\\x7F]      # Remainder of identifier
+                    |\\\\(?:[0-9a-fA-F]{1,6}|.)
+                  )*
+                '''
+                'name': 'variable.css'
+              }
+            ]
+          }
+          {
+            'begin': '{'
+            'beginCaptures':
+              '0':
+                'name': 'punctuation.section.property-list.begin.bracket.curly.css'
+            'end': '}'
+            'endCaptures':
+              '0':
+                'name': 'punctuation.section.property-list.end.bracket.curly.css'
+            'name': 'meta.at-rule.property.body.css'
+            'patterns': [
+              {
+                'include': '#comment-block'
+              }
+              {
+                'include': '#escapes'
+              }
+              {
+                'match': '(?i)(?<![\\w-])(syntax|inherits|initial-value)(?![\\w-])'
+                'name': 'meta.property-name.css support.type.property-name.css'
+              }
+              {
+                'include': '#rule-list-innards'
+              }
+            ]
+          }
+        ]
+      }
+      {
         # Single line @custom-at-rule terminated with `;`, such as
         # @my-rule foo bar;
         'begin': '(?i)(?=@[\\w-]+[^;]+;\s*$)'
@@ -957,7 +1165,7 @@
       }
       # Colors
       {
-        'begin': '(?i)(?<![\\w-])(rgba?|rgb|hsla?|hsl|hwb|lab|oklab|lch|oklch|color)(\\()'
+        'begin': '(?i)(?<![\\w-])(rgba?|rgb|hsla?|hsl|hwb|lab|oklab|lch|oklch|color|color-mix|light-dark|contrast-color|device-cmyk)(\\()'
         'beginCaptures':
           '1':
             'name': 'support.function.misc.css'
@@ -971,6 +1179,13 @@
         'patterns': [
           {
             'include': '#property-values'
+          }
+          # Color-interpolation keywords (`in oklch`, `longer hue`) and relative-color
+          # idents are not property values, so without this they would be left
+          # unscoped. Identifiers only, so separators like `/` stay unscoped.
+          {
+            'match': '(?i)(?<![\\w-])[a-z][\\w-]*(?![\\w-]*\\()'
+            'name': 'variable.parameter.misc.css'
           }
         ]
       }
@@ -1045,10 +1260,12 @@
       {
         'begin': '''(?xi) (?<![\\w-])
           (annotation|attr|blur|brightness|character-variant|clamp|contrast|counters?
-          |cross-fade|drop-shadow|element|fit-content|format|grayscale|hue-rotate|color-mix
+          |cross-fade|drop-shadow|element|fit-content|format|grayscale|hue-rotate
           |image-set|invert|local|max|min|minmax|opacity|ornaments|repeat|saturate|sepia
           |styleset|stylistic|swash|symbols
-          |cos|sin|tan|acos|asin|atan|atan2|hypot|sqrt|pow|log|exp|abs|sign|if|style)
+          |cos|sin|tan|acos|asin|atan|atan2|hypot|sqrt|pow|log|exp|abs|sign|if|style
+          |mod|rem|round|calc-size|progress|media-progress|container-progress
+          |palette-mix|paint|scroll|view|toggle|sibling-index|sibling-count)
           (\\()
         '''
         'beginCaptures':
@@ -1175,6 +1392,85 @@
             'name': 'punctuation.section.function.end.bracket.round.css'
         'name': 'meta.function.custom.css'
         'patterns': [
+          {
+            'include': '#property-values'
+          }
+        ]
+      }
+      # Environment variables
+      {
+        'begin': '(?i)(?<![\\w-])(env)(\\()'
+        'beginCaptures':
+          '1':
+            'name': 'support.function.misc.css'
+          '2':
+            'name': 'punctuation.section.function.begin.bracket.round.css'
+        'end': '\\)'
+        'endCaptures':
+          '0':
+            'name': 'punctuation.section.function.end.bracket.round.css'
+        'name': 'meta.function.env.css'
+        'patterns': [
+          {
+            'match': '''(?xi) \\G\\s*
+              (?: safe-area-inset-(?:top|right|bottom|left)
+                | safe-area-max-inset-(?:top|right|bottom|left)
+                | titlebar-area-(?:x|y|width|height)
+                | keyboard-inset-(?:top|right|bottom|left|width|height)
+                | viewport-segment-(?:top|right|bottom|left|width|height)
+                | preferred-text-scale
+              )
+              (?![\\w-])
+            '''
+            'name': 'support.constant.property-value.css'
+          }
+          {
+            'match': '''(?x) \\G\\s*
+              (?:[-a-zA-Z_]    | [^\\x00-\\x7F])     # First letter
+              (?:[-a-zA-Z0-9_] | [^\\x00-\\x7F]      # Remainder of identifier
+                |\\\\(?:[0-9a-fA-F]{1,6}|.)
+              )*
+            '''
+            'name': 'variable.argument.css'
+          }
+          {
+            'include': '#property-values'
+          }
+        ]
+      }
+      # Anchor positioning
+      {
+        'begin': '(?i)(?<![\\w-])(anchor|anchor-size)(\\()'
+        'beginCaptures':
+          '1':
+            'name': 'support.function.misc.css'
+          '2':
+            'name': 'punctuation.section.function.begin.bracket.round.css'
+        'end': '\\)'
+        'endCaptures':
+          '0':
+            'name': 'punctuation.section.function.end.bracket.round.css'
+        'name': 'meta.function.anchor.css'
+        'patterns': [
+          {
+            'name': 'variable.argument.css'
+            'match': '''(?x)
+              --
+              (?:[-a-zA-Z_]    | [^\\x00-\\x7F])     # First letter
+              (?:[-a-zA-Z0-9_] | [^\\x00-\\x7F]      # Remainder of identifier
+                |\\\\(?:[0-9a-fA-F]{1,6}|.)
+              )*
+            '''
+          }
+          {
+            'match': '''(?xi) (?<![\\w-])
+              (?: top|right|bottom|left|center|start|end|self-start|self-end
+                | inside|outside|width|height|block|inline
+              )
+              (?![\\w-])
+            '''
+            'name': 'support.constant.property-value.css'
+          }
           {
             'include': '#property-values'
           }
@@ -1328,7 +1624,7 @@
       }
       {
         # Logical / Selector-based
-        'begin': '(?i)((:)(?:not|has|matches|where|is))(\\()'
+        'begin': '(?i)((:)(?:not|has|matches|where|is|host|host-context|current|past|future))(\\()'
         'beginCaptures':
           '1':
             'name': 'entity.other.attribute-name.pseudo-class.css'
@@ -1369,6 +1665,182 @@
             'match': '(?i)even|odd'
             'name': 'support.constant.parity.css'
           }
+          {
+            # `of <selector>` syntax, e.g. :nth-child(2 of .visible)
+            'begin': '(?i)(?<=[\\s)])(of)(?=[\\s(]|$)'
+            'beginCaptures':
+              '1':
+                'name': 'keyword.operator.logical.of.css'
+            'end': '(?=\\))'
+            'patterns': [
+              {
+                'include': '#selector-innards'
+              }
+            ]
+          }
+        ]
+      }
+      {
+        # :state() takes a custom identifier, not a selector list
+        'begin': '(?i)((:)state)(\\()'
+        'beginCaptures':
+          '1':
+            'name': 'entity.other.attribute-name.pseudo-class.css'
+          '2':
+            'name': 'punctuation.definition.entity.css'
+          '3':
+            'name': 'punctuation.section.function.begin.bracket.round.css'
+        'end': '\\)'
+        'endCaptures':
+          '0':
+            'name': 'punctuation.section.function.end.bracket.round.css'
+        'patterns': [
+          {
+            'captures':
+              '0':
+                'patterns': [
+                  {
+                    'include': '#escapes'
+                  }
+                ]
+            'match': '''(?x)
+              (?:[-a-zA-Z_]    | [^\\x00-\\x7F])     # First letter
+              (?:[-a-zA-Z0-9_] | [^\\x00-\\x7F]      # Remainder of identifier
+                |\\\\(?:[0-9a-fA-F]{1,6}|.)
+              )*
+            '''
+            'name': 'variable.parameter.state-name.css'
+          }
+          {
+            'include': '#comment-block'
+          }
+        ]
+      }
+    ]
+  'functional-pseudo-elements':
+    'patterns': [
+      {
+        # ::part() and ::highlight() take custom identifiers
+        'begin': '(?i)((::)(?:part|highlight))(\\()'
+        'beginCaptures':
+          '1':
+            'name': 'entity.other.attribute-name.pseudo-element.css'
+          '2':
+            'name': 'punctuation.definition.entity.css'
+          '3':
+            'name': 'punctuation.section.function.begin.bracket.round.css'
+        'end': '\\)'
+        'endCaptures':
+          '0':
+            'name': 'punctuation.section.function.end.bracket.round.css'
+        'patterns': [
+          {
+            'include': '#comment-block'
+          }
+          {
+            'captures':
+              '0':
+                'patterns': [
+                  {
+                    'include': '#escapes'
+                  }
+                ]
+            'match': '''(?x)
+              (?:[-a-zA-Z_]    | [^\\x00-\\x7F])     # First letter
+              (?:[-a-zA-Z0-9_] | [^\\x00-\\x7F]      # Remainder of identifier
+                |\\\\(?:[0-9a-fA-F]{1,6}|.)
+              )*
+            '''
+            'name': 'variable.parameter.pseudo-element.css'
+          }
+        ]
+      }
+      {
+        # View-transition pseudo-elements take a custom identifier or wildcard
+        'begin': '(?i)((::)(?:view-transition-group|view-transition-image-pair|view-transition-new|view-transition-old))(\\()'
+        'beginCaptures':
+          '1':
+            'name': 'entity.other.attribute-name.pseudo-element.css'
+          '2':
+            'name': 'punctuation.definition.entity.css'
+          '3':
+            'name': 'punctuation.section.function.begin.bracket.round.css'
+        'end': '\\)'
+        'endCaptures':
+          '0':
+            'name': 'punctuation.section.function.end.bracket.round.css'
+        'patterns': [
+          {
+            'include': '#comment-block'
+          }
+          {
+            'match': '\\*'
+            'name': 'entity.name.tag.wildcard.css'
+          }
+          {
+            'captures':
+              '0':
+                'patterns': [
+                  {
+                    'include': '#escapes'
+                  }
+                ]
+            'match': '''(?x)
+              (?:[-a-zA-Z_]    | [^\\x00-\\x7F])     # First letter
+              (?:[-a-zA-Z0-9_] | [^\\x00-\\x7F]      # Remainder of identifier
+                |\\\\(?:[0-9a-fA-F]{1,6}|.)
+              )*
+            '''
+            'name': 'variable.parameter.pseudo-element.css'
+          }
+        ]
+      }
+      {
+        # ::scroll-button() takes a physical or logical direction
+        'begin': '(?i)((::)scroll-button)(\\()'
+        'beginCaptures':
+          '1':
+            'name': 'entity.other.attribute-name.pseudo-element.css'
+          '2':
+            'name': 'punctuation.definition.entity.css'
+          '3':
+            'name': 'punctuation.section.function.begin.bracket.round.css'
+        'end': '\\)'
+        'endCaptures':
+          '0':
+            'name': 'punctuation.section.function.end.bracket.round.css'
+        'patterns': [
+          {
+            'include': '#comment-block'
+          }
+          {
+            'match': '\\*'
+            'name': 'entity.name.tag.wildcard.css'
+          }
+          {
+            'match': '(?i)(?<![\\w-])(?:block-start|block-end|inline-start|inline-end|up|down|left|right)(?![\\w-])'
+            'name': 'support.constant.property-value.css'
+          }
+        ]
+      }
+      {
+        # ::slotted() takes a compound selector
+        'begin': '(?i)((::)slotted)(\\()'
+        'beginCaptures':
+          '1':
+            'name': 'entity.other.attribute-name.pseudo-element.css'
+          '2':
+            'name': 'punctuation.definition.entity.css'
+          '3':
+            'name': 'punctuation.section.function.begin.bracket.round.css'
+        'end': '\\)'
+        'endCaptures':
+          '0':
+            'name': 'punctuation.section.function.end.bracket.round.css'
+        'patterns': [
+          {
+            'include': '#selector-innards'
+          }
         ]
       }
     ]
@@ -1399,6 +1871,29 @@
           | orientation
           | display-mode
           | hover
+          | any-hover               # Interaction (Media Queries 4)
+          | pointer
+          | any-pointer
+          | update
+          | overflow-block
+          | overflow-inline
+          | prefers-color-scheme    # User preference (Media Queries 5)
+          | prefers-contrast
+          | prefers-reduced-motion
+          | prefers-reduced-transparency
+          | prefers-reduced-data
+          | forced-colors
+          | inverted-colors
+          | dynamic-range
+          | video-dynamic-range
+          | scripting
+          | color-gamut
+          | display-capabilities
+          | environment-blending
+          | horizontal-viewport-segments
+          | vertical-viewport-segments
+          | nav-controls
+          | shape
         )
         |
         # Deprecated features
@@ -1458,11 +1953,216 @@
         | standalone
         | minimal-ui
         | browser
+        | picture-in-picture
         | hover
+        | none                      # Interaction / preference values
+        | coarse
+        | fine
+        | slow
+        | fast
+        | light                     # prefers-color-scheme
+        | dark
+        | no-preference             # prefers-* neutral value
+        | reduce                    # prefers-reduced-*
+        | more                      # prefers-contrast
+        | less
+        | custom
+        | active                    # forced-colors / scripting
+        | inactive
+        | enabled
+        | initial-only
+        | srgb                      # color-gamut
+        | p3
+        | rec2020
+        | standard                  # dynamic-range
+        | high
+        | rect                      # shape
+        | round
       )
       (?=\\s|\\)|$)
     '''
     'name': 'support.constant.property-value.css'
+  'container-query':
+    'begin': '\\G'
+    'end': '(?=\\s*[{;])'
+    'patterns': [
+      {
+        'include': '#comment-block'
+      }
+      {
+        'include': '#escapes'
+      }
+      {
+        'match': '(?i)(?<=\\s|^|\\*/|\\))(and|or|not)(?=\\s|\\(|/\\*|$)'
+        'name': 'keyword.operator.logical.$1.container.css'
+      }
+      {
+        # style() queries, e.g. @container style(--theme: dark)
+        'begin': '(?i)(?<![\\w-])(style)(\\()'
+        'beginCaptures':
+          '1':
+            'name': 'support.function.style.css'
+          '2':
+            'name': 'punctuation.section.function.begin.bracket.round.css'
+        'end': '\\)'
+        'endCaptures':
+          '0':
+            'name': 'punctuation.section.function.end.bracket.round.css'
+        'name': 'meta.function.style.css'
+        'patterns': [
+          {
+            'include': '#rule-list-innards'
+          }
+        ]
+      }
+      {
+        # Scroll-state queries, e.g. @container scroll-state(stuck: top)
+        'begin': '(?i)(?<![\\w-])(scroll-state)(\\()'
+        'beginCaptures':
+          '1':
+            'name': 'support.function.scroll-state.css'
+          '2':
+            'name': 'punctuation.section.function.begin.bracket.round.css'
+        'end': '\\)'
+        'endCaptures':
+          '0':
+            'name': 'punctuation.section.function.end.bracket.round.css'
+        'name': 'meta.function.scroll-state.css'
+        'patterns': [
+          {
+            'include': '#scroll-state-condition'
+          }
+        ]
+      }
+      {
+        'begin': '\\('
+        'beginCaptures':
+          '0':
+            'name': 'punctuation.definition.parameters.begin.bracket.round.css'
+        'end': '\\)'
+        'endCaptures':
+          '0':
+            'name': 'punctuation.definition.parameters.end.bracket.round.css'
+        'patterns': [
+          {
+            'include': '#container-features'
+          }
+          {
+            'match': '(?i)(?<=\\s|^|\\*/|\\()(and|or|not)(?=\\s|\\(|/\\*|$)'
+            'name': 'keyword.operator.logical.$1.container.css'
+          }
+          {
+            'match': ':'
+            'name': 'punctuation.separator.key-value.css'
+          }
+          {
+            'match': '>=|<=|=|<|>'
+            'name': 'keyword.operator.comparison.css'
+          }
+          {
+            'captures':
+              '1':
+                'name': 'constant.numeric.css'
+              '2':
+                'name': 'keyword.operator.arithmetic.css'
+              '3':
+                'name': 'constant.numeric.css'
+            'match': '(\\d+)\\s*(/)\\s*(\\d+)'
+            'name': 'meta.ratio.css'
+          }
+          {
+            'include': '#media-feature-keywords'
+          }
+          {
+            'include': '#numeric-values'
+          }
+          {
+            'include': '#comment-block'
+          }
+          {
+            'include': '#functions'
+          }
+        ]
+      }
+      {
+        # Optional container name preceding the query, e.g. @container card (…)
+        'captures':
+          '0':
+            'patterns': [
+              {
+                'include': '#escapes'
+              }
+            ]
+        'match': '''(?xi)
+          (?<=^|\\s|\\*/)
+          (?!(?:and|or|not|style)(?![\\w-]))     # Not a logical keyword or style() query
+          (?:[-a-zA-Z_]    | [^\\x00-\\x7F])     # First letter
+          (?:[-a-zA-Z0-9_] | [^\\x00-\\x7F]      # Remainder of identifier
+            |\\\\(?:[0-9a-fA-F]{1,6}|.)
+          )*
+          (?![\\w-]*\\()                         # Not a function call
+        '''
+        'name': 'variable.parameter.container-name.css'
+      }
+    ]
+  'container-features':
+    'captures':
+      '1':
+        'name': 'support.type.property-name.container.css'
+    'match': '''(?xi)
+      (?<=^|\\s|\\(|\\*/)           # Preceded by whitespace, bracket or comment
+      (
+        (?:min-|max-)?              # Range features
+        (?: width
+          | height
+          | inline-size
+          | block-size
+          | aspect-ratio
+        )
+        | orientation               # Discrete features
+        | scrolled
+        | stuck
+        | snapped
+        | scrollable
+      )
+      (?=\\s|$|[><:=]|\\)|/\\*)     # Terminates cleanly
+    '''
+  'scroll-state-condition':
+    'patterns': [
+      {
+        'include': '#comment-block'
+      }
+      {
+        'begin': '\\('
+        'beginCaptures':
+          '0':
+            'name': 'punctuation.definition.parameters.begin.bracket.round.css'
+        'end': '\\)'
+        'endCaptures':
+          '0':
+            'name': 'punctuation.definition.parameters.end.bracket.round.css'
+        'patterns': [
+          {
+            'include': '#scroll-state-condition'
+          }
+        ]
+      }
+      {
+        'include': '#container-features'
+      }
+      {
+        'match': '(?i)(?<=\\s|^|\\*/|\\()(and|or|not)(?=\\s|\\(|/\\*|$)'
+        'name': 'keyword.operator.logical.$1.container.css'
+      }
+      {
+        'match': ':'
+        'name': 'punctuation.separator.key-value.css'
+      }
+      {
+        'match': '(?i)(?<![\\w-])(?:none|top|right|bottom|left|block-start|block-end|inline-start|inline-end|x|y|block|inline)(?![\\w-])'
+        'name': 'support.constant.property-value.css'
+      }
+    ]
   'media-query':
     'begin': '\\G'
     'end': '(?=\\s*[{;])'
@@ -1731,6 +2431,22 @@
             | translate|unicode-bidi|unicode-range|user-select|user-zoom|vertical-align|visibility|white-space|widows|width|will-change
             | word-break|word-spacing|word-wrap|writing-mode|z-index|zoom
 
+            # Anchor positioning, scroll-driven animations, view transitions and other modern additions
+            | anchor-name|anchor-scope|position-anchor|position-area|position-try|position-try-fallbacks|position-try-order
+            | position-visibility|inset-area
+            | animation-composition|animation-range|animation-range-end|animation-range-start|animation-timeline
+            | scroll-timeline|scroll-timeline-axis|scroll-timeline-name|timeline-scope
+            | view-timeline|view-timeline-axis|view-timeline-inset|view-timeline-name
+            | view-transition-class|view-transition-name|view-transition-group
+            | contain-intrinsic-block-size|contain-intrinsic-height|contain-intrinsic-inline-size
+            | contain-intrinsic-size|contain-intrinsic-width|content-visibility
+            | field-sizing|forced-color-adjust|hyphenate-limit-chars|interpolate-size
+            | margin-trim|math-depth|math-shift|math-style|overlay
+            | ruby-overhang|scroll-initial-target|scroll-marker-group|scroll-snap-stop
+            | text-autospace|text-box|text-box-edge|text-box-trim|text-spacing-trim|text-wrap
+            | text-wrap-mode|text-wrap-style|white-space-collapse|word-space-transform
+            | reading-flow|reading-order|dynamic-range-limit|corner-shape|shape
+
             # SVG attributes
             | alignment-baseline|baseline-shift|clip-rule|color-interpolation|color-interpolation-filters|color-profile
             | color-rendering|cx|cy|dominant-baseline|enable-background|fill|fill-opacity|fill-rule|flood-color|flood-opacity
@@ -1829,11 +2545,12 @@
         'name': 'invalid.illegal.colon.css'
     'match': '''(?xi)
       (:)(:*)
-      (?: active|any-link|checked|default|disabled|empty|enabled|first
-        | (?:first|last|only)-(?:child|of-type)|focus|focus-visible|focus-within|fullscreen|host|hover
-        | in-range|indeterminate|invalid|left|link|optional|out-of-range
-        | read-only|read-write|required|right|root|scope|target|unresolved
-        | valid|visited
+      (?: active|any-link|autofill|blank|buffering|checked|current|default|defined|disabled|empty|enabled|first
+        | (?:first|last|only)-(?:child|of-type)|focus|focus-visible|focus-within|fullscreen|future|host|hover
+        | in-range|indeterminate|invalid|left|link|local-link|modal|muted|open|optional|out-of-range
+        | past|paused|picture-in-picture|placeholder-shown|playing|popover-open
+        | read-only|read-write|required|right|root|scope|seeking|stalled|target|target-current|target-within
+        | unresolved|user-invalid|user-valid|valid|visited|volume-locked
       )(?![\\w-]|\\s*[;}])
     '''
     'name': 'entity.other.attribute-name.pseudo-class.css'
@@ -1858,13 +2575,27 @@
         |
         (::)                        # Double-colon only
         (?: backdrop
+          | checkmark
+          | column
           | content
+          | details-content
+          | file-selector-button
           | grammar-error
           | marker
+          | picker-icon
           | placeholder
+          | scroll-button
+          | scroll-marker
+          | scroll-marker-group
           | selection
           | shadow
           | spelling-error
+          | target-text
+          | view-transition
+          | view-transition-group
+          | view-transition-image-pair
+          | view-transition-new
+          | view-transition-old
         )
       )
       (?![\\w-]|\\s*[;}])
@@ -2252,13 +2983,16 @@
         ]
       }
       {
+        'include': '#functional-pseudo-classes'
+      }
+      {
         'include': '#pseudo-classes'
       }
       {
-        'include': '#pseudo-elements'
+        'include': '#functional-pseudo-elements'
       }
       {
-        'include': '#functional-pseudo-classes'
+        'include': '#pseudo-elements'
       }
       # Custom HTML elements
       {
