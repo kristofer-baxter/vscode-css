@@ -5149,6 +5149,17 @@ describe('CSS grammar', function () {
 				});
 			});
 		});
+		it('recognises additional property names as supported', function () {
+			[
+				'anchor-name', 'position-anchor', 'position-area', 'field-sizing',
+				'view-transition-name', 'contain-intrinsic-size', 'scroll-timeline',
+				'margin-trim', 'content-visibility', 'text-wrap-style', 'interpolate-size'
+			].forEach(function (prop) {
+				var tokens = testGrammar.tokenizeLine('a { ' + prop + ': inherit; }').tokens;
+				var t = tokens.find(x => x.value === prop);
+				assert.deepStrictEqual(t.scopes, ['source.css', 'meta.property-list.css', 'meta.property-name.css', 'support.type.property-name.css'], prop);
+			});
+		});
 		it('keeps scoping property names that moved within the property list', function () {
 			// These four sit in a different branch of the property-name
 			// alternation than they used to. The scope is the same either way,
@@ -5168,6 +5179,40 @@ describe('CSS grammar', function () {
 			var tokens = testGrammar.tokenizeLine('a { inset-area: top; }').tokens;
 			assert.ok(!tokens.find(x => x.value === 'inset-area' && x.scopes.includes('support.type.property-name.css')));
 		});
+		it('tokenizes additional pseudo-classes', function () {
+			['popover-open', 'user-valid', 'user-invalid', 'placeholder-shown', 'autofill', 'modal', 'defined', 'open'].forEach(function (pc) {
+				var tokens = testGrammar.tokenizeLine('a:' + pc + ' {}').tokens;
+				assert.deepStrictEqual(tokens[2], { scopes: ['source.css', 'meta.selector.css', 'entity.other.attribute-name.pseudo-class.css'], value: pc });
+			});
+		});
+		it('tokenizes additional pseudo-elements', function () {
+			['details-content', 'file-selector-button', 'target-text', 'backdrop', 'marker'].forEach(function (pe) {
+				var tokens = testGrammar.tokenizeLine('a::' + pe + ' {}').tokens;
+				assert.deepStrictEqual(tokens[2], { scopes: ['source.css', 'meta.selector.css', 'entity.other.attribute-name.pseudo-element.css'], value: pe });
+			});
+		});
+		it('tokenizes ::part() and ::slotted()', function () {
+			var tokens;
+			tokens = testGrammar.tokenizeLine('a::part(btn) {}').tokens;
+			assert.deepStrictEqual(tokens[2], { scopes: ['source.css', 'meta.selector.css', 'entity.other.attribute-name.pseudo-element.css'], value: 'part' });
+			assert.deepStrictEqual(tokens[4], { scopes: ['source.css', 'meta.selector.css', 'variable.parameter.pseudo-element.css'], value: 'btn' });
+
+			tokens = testGrammar.tokenizeLine('a::slotted(.x) {}').tokens;
+			assert.deepStrictEqual(tokens[2], { scopes: ['source.css', 'meta.selector.css', 'entity.other.attribute-name.pseudo-element.css'], value: 'slotted' });
+			assert.deepStrictEqual(tokens[5], { scopes: ['source.css', 'meta.selector.css', 'entity.other.attribute-name.class.css'], value: 'x' });
+		});
+		it('uses the argument grammar for each functional pseudo-element', function () {
+			var tokens = testGrammar.tokenizeLine('a::part(left)::view-transition-old(*)::scroll-button(next)::scroll-button(*) {}').tokens;
+			assert.deepStrictEqual(tokens.find(x => x.value === 'left'), { scopes: ['source.css', 'meta.selector.css', 'variable.parameter.pseudo-element.css'], value: 'left' });
+			assert.deepStrictEqual(tokens.filter(x => x.value === '*').map(x => x.scopes), [
+				['source.css', 'meta.selector.css', 'entity.name.tag.wildcard.css'],
+				['source.css', 'meta.selector.css', 'entity.name.tag.wildcard.css']
+			]);
+			assert.deepStrictEqual(tokens.find(x => x.value === 'next'), { scopes: ['source.css', 'meta.selector.css', 'support.constant.property-value.css'], value: 'next' });
+
+			tokens = testGrammar.tokenizeLine('a::part(*) {}').tokens;
+			assert.deepStrictEqual(tokens.find(x => x.value === '*').scopes, ['source.css', 'meta.selector.css']);
+		});
 		it('does not recognize functional-only pseudo-elements without arguments', function () {
 			['scroll-button', 'view-transition-group', 'view-transition-image-pair', 'view-transition-new', 'view-transition-old'].forEach(function (pseudoElement) {
 				var tokens = testGrammar.tokenizeLine('a::' + pseudoElement + ' {}').tokens;
@@ -5179,6 +5224,49 @@ describe('CSS grammar', function () {
 				var tokens = testGrammar.tokenizeLine('a:' + pseudoClass + '(.x) {}').tokens;
 				assert.ok(!tokens.find(x => x.value === '(' && x.scopes.includes('punctuation.section.function.begin.bracket.round.css')), pseudoClass);
 			});
+		});
+		it('tokenizes scroll marker position pseudo-classes', function () {
+			['target-before', 'target-current', 'target-after'].forEach(function (pseudoClass) {
+				var tokens = testGrammar.tokenizeLine('a:' + pseudoClass + ' {}').tokens;
+				assert.deepStrictEqual(tokens.find(x => x.value === pseudoClass).scopes, ['source.css', 'meta.selector.css', 'entity.other.attribute-name.pseudo-class.css'], pseudoClass);
+			});
+		});
+		it('tokenizes :state() with a custom identifier', function () {
+			var tokens;
+			tokens = testGrammar.tokenizeLine('a:state(loading) {}').tokens;
+			assert.deepStrictEqual(tokens[2], { scopes: ['source.css', 'meta.selector.css', 'entity.other.attribute-name.pseudo-class.css'], value: 'state' });
+			assert.deepStrictEqual(tokens[4], { scopes: ['source.css', 'meta.selector.css', 'variable.parameter.state-name.css'], value: 'loading' });
+		});
+		it('tokenizes functional :host() rather than the bare pseudo-class', function () {
+			var tokens;
+			tokens = testGrammar.tokenizeLine('a:host(.dark) {}').tokens;
+			var host = tokens.find(t => t.value === 'host');
+			assert.deepStrictEqual(host.scopes, ['source.css', 'meta.selector.css', 'entity.other.attribute-name.pseudo-class.css']);
+			var open = tokens.find(t => t.value === '(');
+			assert.deepStrictEqual(open.scopes, ['source.css', 'meta.selector.css', 'punctuation.section.function.begin.bracket.round.css']);
+			var cls = tokens.find(t => t.value === 'dark');
+			assert.deepStrictEqual(cls.scopes, ['source.css', 'meta.selector.css', 'entity.other.attribute-name.class.css']);
+		});
+		it('tokenizes the `of` clause of :nth-child()', function () {
+			var tokens;
+			tokens = testGrammar.tokenizeLine('a:nth-child(2 of .x) {}').tokens;
+			var of = tokens.find(t => t.value === 'of');
+			assert.deepStrictEqual(of.scopes, ['source.css', 'meta.selector.css', 'keyword.operator.logical.of.css']);
+			var cls = tokens.find(t => t.value === 'x');
+			assert.deepStrictEqual(cls.scopes, ['source.css', 'meta.selector.css', 'entity.other.attribute-name.class.css']);
+		});
+		it('accepts an `of` clause not separated from its selector by a space', function () {
+			// `of` is an identifier, so a class, id, attribute or comment may follow
+			// it directly. Requiring whitespace dropped the selector on the floor.
+			[['a:nth-child(2 of.x) {}', 'x', 'entity.other.attribute-name.class.css'],
+			 ['a:nth-child(2 of#x) {}', 'x', 'entity.other.attribute-name.id.css'],
+			 ['a:nth-child(2 of/*c*/.x) {}', 'x', 'entity.other.attribute-name.class.css']].forEach(function (probe) {
+				var tokens = testGrammar.tokenizeLine(probe[0]).tokens;
+				assert.deepStrictEqual(tokens.find(t => t.value === 'of').scopes, ['source.css', 'meta.selector.css', 'keyword.operator.logical.of.css'], probe[0]);
+				assert.deepStrictEqual(tokens.find(t => t.value === probe[1]).scopes, ['source.css', 'meta.selector.css', probe[2]], probe[0]);
+			});
+			var attr = testGrammar.tokenizeLine('a:nth-child(2 of[hidden]) {}').tokens;
+			assert.deepStrictEqual(attr.find(t => t.value === 'hidden').scopes, ['source.css', 'meta.selector.css', 'meta.attribute-selector.css', 'entity.other.attribute-name.css']);
 		});
 		it('does not accept an `of` clause in :nth-of-type()', function () {
 			// Selectors 4 gives the `of S` syntax to :nth-child()/:nth-last-child()
@@ -5208,6 +5296,43 @@ describe('CSS grammar', function () {
 		it('does not recognize pseudo-classes removed from Selectors 4', function () {
 			var tokens = testGrammar.tokenizeLine('a:target-within {}').tokens;
 			assert.ok(!tokens.find(x => x.value === 'target-within' && x.scopes.includes('entity.other.attribute-name.pseudo-class.css')));
+		});
+		it('keeps pseudo-classes deferred to Selectors 5', function () {
+			['blank', 'local-link'].forEach(function (pseudoClass) {
+				var tokens = testGrammar.tokenizeLine('a:' + pseudoClass + ' {}').tokens;
+				assert.deepStrictEqual(tokens[2], { scopes: ['source.css', 'meta.selector.css', 'entity.other.attribute-name.pseudo-class.css'], value: pseudoClass });
+			});
+		});
+		it('recognises user-preference media features', function () {
+			['prefers-color-scheme', 'prefers-contrast', 'prefers-reduced-motion', 'forced-colors', 'dynamic-range'].forEach(function (mf) {
+				var tokens = testGrammar.tokenizeLine('@media (' + mf + ': none) {}').tokens;
+				var t = tokens.find(x => x.value === mf);
+				assert.deepStrictEqual(t.scopes, ['source.css', 'meta.at-rule.media.header.css', 'support.type.property-name.media.css'], mf);
+			});
+		});
+		it('recognises interaction media features', function () {
+			['pointer', 'any-pointer', 'hover', 'any-hover', 'update', 'scripting'].forEach(function (mf) {
+				var tokens = testGrammar.tokenizeLine('@media (' + mf + ': none) {}').tokens;
+				var t = tokens.find(x => x.value === mf);
+				assert.deepStrictEqual(t.scopes, ['source.css', 'meta.at-rule.media.header.css', 'support.type.property-name.media.css'], mf);
+			});
+		});
+		it('treats viewport segments as range features', function () {
+			[
+				'horizontal-viewport-segments',
+				'min-horizontal-viewport-segments',
+				'max-horizontal-viewport-segments',
+				'vertical-viewport-segments',
+				'min-vertical-viewport-segments',
+				'max-vertical-viewport-segments'
+			].forEach(function (mf) {
+				var tokens = testGrammar.tokenizeLine('@media (' + mf + ': 2) {}').tokens;
+				var t = tokens.find(x => x.value === mf);
+				assert.deepStrictEqual(t.scopes, ['source.css', 'meta.at-rule.media.header.css', 'support.type.property-name.media.css'], mf);
+			});
+
+			var tokens = testGrammar.tokenizeLine('@media (horizontal-viewport-segments > 1) {}').tokens;
+			assert.deepStrictEqual(tokens.find(x => x.value === '>').scopes, ['source.css', 'meta.at-rule.media.header.css', 'keyword.operator.comparison.css']);
 		});
 		it('does not recognize removed media features', function () {
 			['display-capabilities', 'shape'].forEach(function (feature) {

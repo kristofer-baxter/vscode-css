@@ -1799,7 +1799,7 @@
       }
       {
         # Logical / Selector-based
-        'begin': '(?i)((:)(?:not|has|matches|where|is))(\\()'
+        'begin': '(?i)((:)(?:not|has|matches|where|is|host|host-context|current))(\\()'
         'beginCaptures':
           '1':
             'name': 'entity.other.attribute-name.pseudo-class.css'
@@ -1840,6 +1840,19 @@
             'match': '(?i)even|odd'
             'name': 'support.constant.parity.css'
           }
+          {
+            # `of <selector>` syntax, e.g. :nth-child(2 of .visible)
+            'begin': '(?i)(?<=[\\s)]|\\*/)(of)(?=[\\s(:.#\\[]|/\\*|$)'
+            'beginCaptures':
+              '1':
+                'name': 'keyword.operator.logical.of.css'
+            'end': '(?=\\)|\\{)'
+            'patterns': [
+              {
+                'include': '#selector-innards'
+              }
+            ]
+          }
         ]
       }
       {
@@ -1867,6 +1880,169 @@
           }
         ]
       }
+      {
+        # :state() takes a custom identifier, not a selector list
+        'begin': '(?i)((:)state)(\\()'
+        'beginCaptures':
+          '1':
+            'name': 'entity.other.attribute-name.pseudo-class.css'
+          '2':
+            'name': 'punctuation.definition.entity.css'
+          '3':
+            'name': 'punctuation.section.function.begin.bracket.round.css'
+        'end': '(\\))|(?=\\{)'
+        'endCaptures':
+          '1':
+            'name': 'punctuation.section.function.end.bracket.round.css'
+        'patterns': [
+          {
+            'captures':
+              '0':
+                'patterns': [
+                  {
+                    'include': '#escapes'
+                  }
+                ]
+            'match': '''(?x)
+              (?:[-a-zA-Z_]    | [^\\x00-\\x7F])     # First letter
+              (?:[-a-zA-Z0-9_] | [^\\x00-\\x7F]      # Remainder of identifier
+                |\\\\(?:[0-9a-fA-F]{1,6}|.)
+              )*
+            '''
+            'name': 'variable.parameter.state-name.css'
+          }
+          {
+            'include': '#comment-block'
+          }
+        ]
+      }
+    ]
+  'functional-pseudo-elements':
+    'patterns': [
+      {
+        # ::part() and ::highlight() take custom identifiers
+        'begin': '(?i)((::)(?:part|highlight))(\\()'
+        'beginCaptures':
+          '1':
+            'name': 'entity.other.attribute-name.pseudo-element.css'
+          '2':
+            'name': 'punctuation.definition.entity.css'
+          '3':
+            'name': 'punctuation.section.function.begin.bracket.round.css'
+        'end': '(\\))|(?=\\{)'
+        'endCaptures':
+          '1':
+            'name': 'punctuation.section.function.end.bracket.round.css'
+        'patterns': [
+          {
+            'include': '#comment-block'
+          }
+          {
+            'captures':
+              '0':
+                'patterns': [
+                  {
+                    'include': '#escapes'
+                  }
+                ]
+            'match': '''(?x)
+              (?:[-a-zA-Z_]    | [^\\x00-\\x7F])     # First letter
+              (?:[-a-zA-Z0-9_] | [^\\x00-\\x7F]      # Remainder of identifier
+                |\\\\(?:[0-9a-fA-F]{1,6}|.)
+              )*
+            '''
+            'name': 'variable.parameter.pseudo-element.css'
+          }
+        ]
+      }
+      {
+        # View-transition pseudo-elements take a custom identifier or wildcard
+        'begin': '(?i)((::)(?:view-transition-group|view-transition-image-pair|view-transition-new|view-transition-old))(\\()'
+        'beginCaptures':
+          '1':
+            'name': 'entity.other.attribute-name.pseudo-element.css'
+          '2':
+            'name': 'punctuation.definition.entity.css'
+          '3':
+            'name': 'punctuation.section.function.begin.bracket.round.css'
+        'end': '(\\))|(?=\\{)'
+        'endCaptures':
+          '1':
+            'name': 'punctuation.section.function.end.bracket.round.css'
+        'patterns': [
+          {
+            'include': '#comment-block'
+          }
+          {
+            'match': '\\*'
+            'name': 'entity.name.tag.wildcard.css'
+          }
+          {
+            'captures':
+              '0':
+                'patterns': [
+                  {
+                    'include': '#escapes'
+                  }
+                ]
+            'match': '''(?x)
+              (?:[-a-zA-Z_]    | [^\\x00-\\x7F])     # First letter
+              (?:[-a-zA-Z0-9_] | [^\\x00-\\x7F]      # Remainder of identifier
+                |\\\\(?:[0-9a-fA-F]{1,6}|.)
+              )*
+            '''
+            'name': 'variable.parameter.pseudo-element.css'
+          }
+        ]
+      }
+      {
+        # ::scroll-button() takes a physical or logical direction
+        'begin': '(?i)((::)scroll-button)(\\()'
+        'beginCaptures':
+          '1':
+            'name': 'entity.other.attribute-name.pseudo-element.css'
+          '2':
+            'name': 'punctuation.definition.entity.css'
+          '3':
+            'name': 'punctuation.section.function.begin.bracket.round.css'
+        'end': '(\\))|(?=\\{)'
+        'endCaptures':
+          '1':
+            'name': 'punctuation.section.function.end.bracket.round.css'
+        'patterns': [
+          {
+            'include': '#comment-block'
+          }
+          {
+            'match': '\\*'
+            'name': 'entity.name.tag.wildcard.css'
+          }
+          {
+            'match': '(?i)(?<![\\w-])(?:block-start|block-end|inline-start|inline-end|up|down|left|right|prev|next)(?![\\w-])'
+            'name': 'support.constant.property-value.css'
+          }
+        ]
+      }
+      {
+        # ::slotted() takes a compound selector
+        'begin': '(?i)((::)slotted)(\\()'
+        'beginCaptures':
+          '1':
+            'name': 'entity.other.attribute-name.pseudo-element.css'
+          '2':
+            'name': 'punctuation.definition.entity.css'
+          '3':
+            'name': 'punctuation.section.function.begin.bracket.round.css'
+        'end': '(\\))|(?=\\{)'
+        'endCaptures':
+          '1':
+            'name': 'punctuation.section.function.end.bracket.round.css'
+        'patterns': [
+          {
+            'include': '#selector-innards'
+          }
+        ]
+      }
     ]
   'media-features':
     'captures':
@@ -1889,12 +2065,33 @@
             | color-index
             | monochrome
             | resolution
+            | horizontal-viewport-segments
+            | vertical-viewport-segments
           )
           | grid                    # Discrete features
           | scan
           | orientation
           | display-mode
           | hover
+          | any-hover               # Interaction (Media Queries 4)
+          | pointer
+          | any-pointer
+          | update
+          | overflow-block
+          | overflow-inline
+          | prefers-color-scheme    # User preference (Media Queries 5)
+          | prefers-contrast
+          | prefers-reduced-motion
+          | prefers-reduced-transparency
+          | prefers-reduced-data
+          | forced-colors
+          | inverted-colors
+          | dynamic-range
+          | video-dynamic-range
+          | scripting
+          | color-gamut
+          | environment-blending
+          | nav-controls
         )
         |
         # Deprecated features
@@ -2564,6 +2761,22 @@
             | translate|unicode-bidi|unicode-range|user-select|user-zoom|vertical-align|visibility|white-space|widows|width|will-change
             | word-break|word-spacing|word-wrap|writing-mode|z-index|zoom
 
+            # Anchor positioning, scroll-driven animations, view transitions and other additions
+            | anchor-name|anchor-scope|position-anchor|position-area|position-try|position-try-fallbacks|position-try-order
+            | position-visibility
+            | animation-composition
+            | scroll-timeline|scroll-timeline-axis|scroll-timeline-name|timeline-scope
+            | view-timeline|view-timeline-axis|view-timeline-inset|view-timeline-name
+            | view-transition-class|view-transition-name|view-transition-group
+            | contain-intrinsic-block-size|contain-intrinsic-height|contain-intrinsic-inline-size
+            | contain-intrinsic-size|contain-intrinsic-width|content-visibility
+            | field-sizing|forced-color-adjust|hyphenate-limit-chars|interpolate-size
+            | margin-trim|math-depth|math-shift|math-style|overlay
+            | ruby-overhang|scroll-initial-target|scroll-marker-group
+            | text-autospace|text-box|text-box-edge|text-box-trim|text-spacing-trim|text-wrap
+            | text-wrap-mode|text-wrap-style|white-space-collapse|word-space-transform
+            | reading-flow|reading-order|dynamic-range-limit|corner-shape
+
             # SVG attributes
             | alignment-baseline|baseline-shift|clip-rule|color-interpolation|color-interpolation-filters|color-profile
             | color-rendering|cx|cy|dominant-baseline|enable-background|fill|fill-opacity|fill-rule|flood-color|flood-opacity
@@ -2588,13 +2801,13 @@
             | orient|origin|overflow-style|overhang|pack|page|page-policy|pause|pause-after|pause-before|phonemes|pitch|pitch-range
             | play-count|play-during|play-state|point|presentation|presentation-level|profile|property|punctuation|punctuation-trim
             | radius|rate|rendering-intent|repeat|replace|reset|resolution|resource|respond-to|rest|rest-after|rest-before|richness
-            | right-color|right-style|right-width|role|rotation|rotation-point|rows|ruby|ruby-overhang|ruby-span|rule|rule-color
+            | right-color|right-style|right-width|role|rotation|rotation-point|rows|ruby|ruby-span|rule|rule-color
             | rule-style|rule-width|shadow|size|size-adjust|sizing|space|space-collapse|spacing|span|speak|speak-header|speak-numeral
             | speak-punctuation|speech|speech-rate|speed|stacking|stacking-ruby|stacking-shift|stacking-strategy|stress|stretch
             | string-set|style|style-image|style-position|style-type|target|target-name|target-new|target-position|text|text-height
-            | text-justify|text-outline|text-replace|text-wrap|timing-function|top-color|top-left-radius|top-right-radius|top-style
+            | text-justify|text-outline|text-replace|timing-function|top-color|top-left-radius|top-right-radius|top-style
             | top-width|trim|unicode|up|user-select|variant|voice|voice-balance|voice-duration|voice-family|voice-pitch|voice-pitch-range
-            | voice-rate|voice-stress|voice-volume|volume|weight|white|white-space-collapse|word|wrap
+            | voice-rate|voice-stress|voice-volume|volume|weight|white|word|wrap
           )
           (?![\\w-])
         '''
@@ -2662,11 +2875,12 @@
         'name': 'invalid.illegal.colon.css'
     'match': '''(?xi)
       (:)(:*)
-      (?: active|any-link|checked|default|disabled|empty|enabled|first
-        | (?:first|last|only)-(?:child|of-type)|focus|focus-visible|focus-within|fullscreen|host|hover
-        | in-range|indeterminate|invalid|left|link|optional|out-of-range
-        | read-only|read-write|required|right|root|scope|target|unresolved
-        | valid|visited
+      (?: active|any-link|autofill|blank|buffering|checked|current|default|defined|disabled|empty|enabled|first
+        | (?:first|last|only)-(?:child|of-type)|focus|focus-visible|focus-within|fullscreen|future|host|hover
+        | in-range|indeterminate|invalid|left|link|local-link|modal|muted|open|optional|out-of-range
+        | past|paused|picture-in-picture|placeholder-shown|playing|popover-open
+        | read-only|read-write|required|right|root|scope|seeking|stalled|target|target-after|target-before|target-current
+        | unresolved|user-invalid|user-valid|valid|visited|volume-locked
       )(?![\\w-]|\\s*[;}])
     '''
     'name': 'entity.other.attribute-name.pseudo-class.css'
@@ -2691,13 +2905,22 @@
         |
         (::)                        # Double-colon only
         (?: backdrop
+          | checkmark
+          | column
           | content
+          | details-content
+          | file-selector-button
           | grammar-error
           | marker
+          | picker-icon
           | placeholder
+          | scroll-marker
+          | scroll-marker-group
           | selection
           | shadow
           | spelling-error
+          | target-text
+          | view-transition
         )
       )
       (?![\\w-]|\\s*[;}])
@@ -3085,13 +3308,16 @@
         ]
       }
       {
+        'include': '#functional-pseudo-classes'
+      }
+      {
         'include': '#pseudo-classes'
       }
       {
-        'include': '#pseudo-elements'
+        'include': '#functional-pseudo-elements'
       }
       {
-        'include': '#functional-pseudo-classes'
+        'include': '#pseudo-elements'
       }
       # Custom HTML elements
       {
