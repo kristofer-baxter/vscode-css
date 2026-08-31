@@ -1267,7 +1267,7 @@
       }
       # Colors
       {
-        'begin': '(?i)(?<![\\w-])(rgba?|rgb|hsla?|hsl|hwb|lab|oklab|lch|oklch|color)(\\()'
+        'begin': '(?i)(?<![\\w-])(rgba?|rgb|hsla?|hsl|hwb|lab|oklab|lch|oklch|color|color-mix|light-dark|contrast-color|device-cmyk)(\\()'
         'beginCaptures':
           '1':
             'name': 'support.function.misc.css'
@@ -1281,6 +1281,15 @@
         'patterns': [
           {
             'include': '#property-values'
+          }
+          # Color-interpolation keywords (`in oklch`, `longer hue`) and relative-color
+          # idents are not property values, so without this they would be left
+          # unscoped. Identifiers only, so separators like `/` stay unscoped.
+          # A `<custom-color-space>` is a `<dashed-ident>`, so `in --brand-space`
+          # has to be accepted here too.
+          {
+            'match': '(?i)(?<![\\w-])(?:--[\\w-]*|[a-z][\\w-]*)(?![\\w(-])'
+            'name': 'variable.parameter.misc.css'
           }
         ]
       }
@@ -1387,10 +1396,12 @@
       {
         'begin': '''(?xi) (?<![\\w-])
           (annotation|blur|brightness|character-variant|clamp|contrast|counters?
-          |cross-fade|drop-shadow|element|fit-content|format|grayscale|hue-rotate|color-mix
+          |cross-fade|drop-shadow|element|fit-content|format|grayscale|hue-rotate
           |image-set|invert|local|max|min|minmax|opacity|ornaments|repeat|saturate|sepia
           |styleset|stylistic|swash|symbols
-          |cos|sin|tan|acos|asin|atan|atan2|hypot|sqrt|pow|log|exp|abs|sign|if|style)
+          |cos|sin|tan|acos|asin|atan|atan2|hypot|sqrt|pow|log|exp|abs|sign
+          |mod|rem|round|calc-size|progress
+          |palette-mix|paint|scroll|view|sibling-index|sibling-count)
           (\\()
         '''
         'beginCaptures':
@@ -1522,6 +1533,116 @@
             'name': 'punctuation.section.function.end.bracket.round.css'
         'name': 'meta.function.custom.css'
         'patterns': [
+          {
+            'include': '#property-values'
+          }
+        ]
+      }
+      # Environment variables
+      {
+        'begin': '(?i)(?<![\\w-])(env)(\\()'
+        'beginCaptures':
+          '1':
+            'name': 'support.function.misc.css'
+          '2':
+            'name': 'punctuation.section.function.begin.bracket.round.css'
+        'end': '\\)'
+        'endCaptures':
+          '0':
+            'name': 'punctuation.section.function.end.bracket.round.css'
+        'name': 'meta.function.env.css'
+        'patterns': [
+          {
+            # The environment variable name is only the first argument, so it
+            # is matched as this region's `end`: the region skips whatever
+            # comments and line breaks precede the name, scopes it, and then
+            # closes, which stops a second identifier (`env(--a --b)`) from
+            # being scoped as a name too.
+            # The `begin` and the region's zero-width `end` alternative are
+            # both zero-width, so the characters the region can end on must be
+            # excluded from the ones it may begin on: otherwise `env(;` pushes
+            # and pops without advancing, which makes the tokenizer abandon the
+            # line and leak this rule to end-of-file.
+            'begin': '\\G(?![,;{})])'
+            'end': '''(?xi)
+              (?<![\\\\\\w-])                   # Not mid-identifier, not mid-escape
+              (?: ( safe-area-inset-(?:top|right|bottom|left)
+                  | safe-area-max-inset-(?:top|right|bottom|left)
+                  | titlebar-area-(?:x|y|width|height)
+                  | keyboard-inset-(?:top|right|bottom|left|width|height)
+                  | viewport-segment-(?:top|right|bottom|left|width|height)
+                  | preferred-text-scale
+                  )
+                  (?![\\w-])
+                | ( (?> (?:[-a-zA-Z_]    | [^\\x00-\\x7F]        # First letter
+                          |\\\\(?:[0-9a-fA-F]{1,6}[ \\t]?|[^\\n])
+                        )
+                        (?:[-a-zA-Z0-9_] | [^\\x00-\\x7F]        # Remainder
+                          |\\\\(?:[0-9a-fA-F]{1,6}[ \\t]?|[^\\n])
+                        )*
+                    )
+                    (?!\\()                    # A function is not a name
+                  )
+              )
+              | (?=[,;{})])                    # Malformed: give up on a name
+            '''
+            'endCaptures':
+              '1':
+                'name': 'support.constant.property-value.css'
+              '2':
+                'name': 'variable.argument.css'
+            'patterns': [
+              {
+                'include': '#comment-block'
+              }
+              {
+                'include': '#numeric-values'    # Indices, e.g. env(viewport-segment-width 0 0)
+              }
+              {
+                'include': '#property-values'   # Anything that is not a name: strings,
+              }                                 # nested functions, malformed arguments
+            ]
+          }
+          {
+            'include': '#property-values'
+          }
+        ]
+      }
+      # Anchor positioning
+      {
+        'begin': '(?i)(?<![\\w-])(anchor|anchor-size)(\\()'
+        'beginCaptures':
+          '1':
+            'name': 'support.function.misc.css'
+          '2':
+            'name': 'punctuation.section.function.begin.bracket.round.css'
+        'end': '(\\))|(?=\\{)'
+        'endCaptures':
+          '1':
+            'name': 'punctuation.section.function.end.bracket.round.css'
+        'name': 'meta.function.anchor.css'
+        'patterns': [
+          {
+            'name': 'variable.argument.css'
+            'match': '''(?x)
+              --
+              (?:[-a-zA-Z_]    | [^\\x00-\\x7F])     # First letter
+              (?:[-a-zA-Z0-9_] | [^\\x00-\\x7F]      # Remainder of identifier
+                |\\\\(?:[0-9a-fA-F]{1,6}|.)
+              )*
+            '''
+          }
+          {
+            'match': '''(?xi) (?<![\\w-])
+              (?: top|right|bottom|left|center|start|end|self-start|self-end
+                | inside|outside                    # <anchor-side>
+                | width|height|block|inline
+                | self-block|self-inline            # <anchor-size>
+              )
+              (?![\\w-])
+            '''
+            'name': 'support.constant.property-value.css'
+          }
           {
             'include': '#property-values'
           }
