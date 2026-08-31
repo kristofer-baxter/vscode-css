@@ -4576,6 +4576,76 @@ describe('CSS grammar', function () {
 				assert.deepStrictEqual(t.scopes, ['source.css', 'meta.at-rule.media.header.css', 'support.constant.property-value.css'], pair.join(': '));
 			});
 		});
+		it('tokenizes block at-rules whose prelude is omitted entirely', function () {
+			[
+				['@container{ .x { color: red; } }', 'container'],
+				['@scope{ .x { color: red; } }', 'scope'],
+				['@starting-style{ .x { color: red; } }', 'starting-style']
+			].forEach(function (pair) {
+				var tokens = testGrammar.tokenizeLine(pair[0]).tokens;
+				assert.deepStrictEqual(tokens[1], { scopes: ['source.css', 'meta.at-rule.' + pair[1] + '.header.css', 'keyword.control.at-rule.' + pair[1] + '.css'], value: pair[1] }, pair[0]);
+				assert.deepStrictEqual(tokens[2].scopes, ['source.css', 'meta.at-rule.' + pair[1] + '.body.css', 'punctuation.section.' + pair[1] + '.begin.bracket.curly.css'], pair[0]);
+			});
+		});
+		it('tokenizes @scope preludes as selectors', function () {
+			var tokens;
+			tokens = testGrammar.tokenizeLine('@scope (.a) to (.b) {').tokens;
+			assert.deepStrictEqual(tokens[1], { scopes: ['source.css', 'meta.at-rule.scope.header.css', 'keyword.control.at-rule.scope.css'], value: 'scope' });
+			// The selector before `to` is the scope root and the one after it is
+			// the scoping limit, so the two carry different scopes.
+			assert.deepStrictEqual(tokens[4], { scopes: ['source.css', 'meta.at-rule.scope.header.css', 'meta.scope.start.css', 'entity.other.attribute-name.class.css', 'punctuation.definition.entity.css'], value: '.' });
+			assert.deepStrictEqual(tokens[5], { scopes: ['source.css', 'meta.at-rule.scope.header.css', 'meta.scope.start.css', 'entity.other.attribute-name.class.css'], value: 'a' });
+			var to = tokens.find(t => t.value === 'to');
+			assert.deepStrictEqual(to.scopes, ['source.css', 'meta.at-rule.scope.header.css', 'keyword.operator.logical.scope.css']);
+			assert.deepStrictEqual(tokens.find(t => t.value === 'b').scopes, ['source.css', 'meta.at-rule.scope.header.css', 'meta.scope.limit.css', 'entity.other.attribute-name.class.css']);
+			// A scope root may itself contain a functional pseudo-class, whose
+			// closing parenthesis must not end the prelude region.
+			var nested = testGrammar.tokenizeLine('@scope (:has(.a)) to (.b) {').tokens;
+			assert.deepStrictEqual(nested.find(t => t.value === 'has').scopes, ['source.css', 'meta.at-rule.scope.header.css', 'meta.scope.start.css', 'entity.other.attribute-name.pseudo-class.css']);
+			assert.deepStrictEqual(nested.find(t => t.value === 'b').scopes, ['source.css', 'meta.at-rule.scope.header.css', 'meta.scope.limit.css', 'entity.other.attribute-name.class.css']);
+		});
+		it('tokenizes @starting-style', function () {
+			var tokens;
+			tokens = testGrammar.tokenizeLine('@starting-style { .z { opacity: 0; } }').tokens;
+			assert.deepStrictEqual(tokens[1], { scopes: ['source.css', 'meta.at-rule.starting-style.header.css', 'keyword.control.at-rule.starting-style.css'], value: 'starting-style' });
+		});
+		it('consumes the whitespace that terminates a hex escape in a custom property name', function () {
+			// `\\31 foo` is the single identifier `--1foo`: the space ends the hex
+			// escape rather than ending the name.
+			var tokens = testGrammar.tokenizeLine('@property --\\31 foo { syntax: "*"; }').tokens;
+			var tail = tokens.find(t => t.value === ' foo');
+			assert.ok(tail && tail.scopes.includes('variable.css'), 'the escape terminator and what follows it stay part of the name');
+		});
+		it('scopes @property descriptors and the custom property name', function () {
+			var lines;
+			lines = testGrammar.tokenizeLines('@property --my-color {\n  syntax: "<color>";\n  inherits: false;\n}\n.after { color: red; }');
+			assert.deepStrictEqual(lines[0][1], { scopes: ['source.css', 'meta.at-rule.property.header.css', 'keyword.control.at-rule.property.css'], value: 'property' });
+			assert.deepStrictEqual(lines[0][3], { scopes: ['source.css', 'meta.at-rule.property.header.css', 'variable.css'], value: '--my-color' });
+			assert.deepStrictEqual(lines[1][1], { scopes: ['source.css', 'meta.at-rule.property.body.css', 'meta.property-name.css', 'support.type.property-name.css'], value: 'syntax' });
+			assert.deepStrictEqual(lines[2][1], { scopes: ['source.css', 'meta.at-rule.property.body.css', 'meta.property-name.css', 'support.type.property-name.css'], value: 'inherits' });
+			// The generic at-rule fallback already closed this block correctly, so
+			// this only guards the dedicated rule against regressing that behaviour.
+			assert.deepStrictEqual(lines[4][0], { scopes: ['source.css', 'meta.selector.css', 'entity.other.attribute-name.class.css', 'punctuation.definition.entity.css'], value: '.' });
+			assert.deepStrictEqual(lines[4][1], { scopes: ['source.css', 'meta.selector.css', 'entity.other.attribute-name.class.css'], value: 'after' });
+		});
+		it('tokenizes @property names beginning with a digit after the required dashes', function () {
+			var tokens = testGrammar.tokenizeLine('@property --4-grid-columns {').tokens;
+			assert.deepStrictEqual(tokens.find(x => x.value === '--4-grid-columns').scopes, ['source.css', 'meta.at-rule.property.header.css', 'variable.css']);
+		});
+		it('recovers from an unclosed parenthesis in a @scope prelude', function () {
+			// The parenthesised regions used to end only on `)`, so an unclosed
+			// prelude leaked its header scope to the end of the document. A
+			// `{` is never legal inside `<scope-start>` or `<scope-end>`, so
+			// this region bails out at one. `@container` conditions do not:
+			// `<general-enclosed>` admits a balanced `{...}` block there.
+			[
+				['@scope (:is(.a){', ['source.css', 'meta.at-rule.scope.body.css']],
+				['@scope (:is(.a)', ['source.css']]
+			].forEach(function (probe) {
+				var source = probe[0] + '\n.after { color: red; }';
+				assert.deepStrictEqual(testGrammar.scopeStackAtEnd(source), probe[1], probe[0]);
+			});
+		});
 		it('keeps a brace that the query itself closes, in every guarded region', function () {
 			// One case per region that does *not* carry the brace bail-out,
 			// because `<any-value>`/`<declaration-value>` admits a balanced
@@ -4594,6 +4664,47 @@ describe('CSS grammar', function () {
 				assert.ok(close.scopes.indexOf('meta.at-rule.' + probe[1] + '.header.css') !== -1, probe[0] + ' -> ) left the header: ' + close.scopes.join('|'));
 				assert.deepStrictEqual(lines[1].find(t => t.value === 'z').scopes, ['source.css', 'meta.at-rule.' + probe[1] + '.body.css', 'meta.selector.css', 'entity.other.attribute-name.class.css'], probe[0]);
 			});
+		});
+		it('does not bail out of a prelude that legally spans lines', function () {
+			// The bail-out is line-local, so a `;` inside a prelude whose `)`
+			// only arrives on a later line is the case it can most easily get
+			// wrong. `<any-value>` permits a top-level `;` and
+			// `<declaration-value>` permits one inside any balanced block, so
+			// none of these may end the query early.
+			[
+				'@container (future;\n syntax)',
+				'@container style(--x: [a;\n b])',
+				'@container style(--x: (a;\n b))',
+				'@container style(foo(a;\n b))',
+				'@container (min-width: 1px) and\n (max-width: 9px)',
+				'@scope (.a) to\n (.b)'
+			].forEach(function (prelude) {
+				var lines = testGrammar.tokenizeLines(prelude + ' {\n.z { color: red; }\n}');
+				var close = lines[1].filter(t => t.value === ')').pop();
+				assert.ok(close.scopes.some(s => s.startsWith('meta.at-rule.')), prelude + ' -> ) left the header: ' + close.scopes.join('|'));
+				assert.deepStrictEqual(lines[2].find(t => t.value === 'z').scopes, ['source.css', 'meta.at-rule.container.body.css', 'meta.selector.css', 'entity.other.attribute-name.class.css'].map(function (s) {
+					return prelude.startsWith('@scope') ? s.replace('container', 'scope') : s;
+				}), prelude);
+			});
+		});
+		it('still opens the body when a prelude parenthesis is left unclosed before `{`', function () {
+			[
+				['@scope (.a {', 'scope']
+			].forEach(function (probe) {
+				var lines = testGrammar.tokenizeLines(probe[0] + '\n  color: red;\n}');
+				assert.deepStrictEqual(lines[0].find(t => t.value === '{').scopes, ['source.css', 'meta.at-rule.' + probe[1] + '.body.css', 'punctuation.section.' + probe[1] + '.begin.bracket.curly.css'], probe[0]);
+			});
+		});
+		it('keeps scoping the closing parenthesis of a well-formed prelude', function () {
+			var tokens = testGrammar.tokenizeLine('@container (width > 400px) {').tokens;
+			assert.deepStrictEqual(tokens.find(t => t.value === ')').scopes, ['source.css', 'meta.at-rule.container.header.css', 'punctuation.definition.parameters.end.bracket.round.css']);
+			tokens = testGrammar.tokenizeLine('@container style(--theme: dark) {').tokens;
+			assert.deepStrictEqual(tokens.find(t => t.value === ')').scopes, ['source.css', 'meta.at-rule.container.header.css', 'meta.function.style.css', 'punctuation.section.function.end.bracket.round.css']);
+			tokens = testGrammar.tokenizeLine('@container scroll-state(stuck: top) {').tokens;
+			assert.deepStrictEqual(tokens.find(t => t.value === ')').scopes, ['source.css', 'meta.at-rule.container.header.css', 'meta.function.scroll-state.css', 'punctuation.section.function.end.bracket.round.css']);
+			tokens = testGrammar.tokenizeLine('@scope (.a) to (.b) {').tokens;
+			assert.deepStrictEqual(tokens.find(t => t.value === ')').scopes, ['source.css', 'meta.at-rule.scope.header.css', 'meta.scope.start.css', 'punctuation.definition.parameters.end.bracket.round.css']);
+			assert.deepStrictEqual(tokens.filter(t => t.value === ')')[1].scopes, ['source.css', 'meta.at-rule.scope.header.css', 'meta.scope.limit.css', 'punctuation.definition.parameters.end.bracket.round.css']);
 		});
 		it('recovers for every region that carries the brace bail-out', function () {
 			// One case per region carrying the bail-out, so that dropping it from
