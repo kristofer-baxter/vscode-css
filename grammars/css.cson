@@ -645,6 +645,47 @@
         ]
       },
       {
+        # @container
+        'begin': '(?i)(?=@container([\\s({;]|/\\*|$))'
+        'end': '(?<=})(?!\\G)|(?=;)'
+        'patterns': [
+          {
+            'begin': '(?i)\\G(@)container'
+            'beginCaptures':
+              '0':
+                'name': 'keyword.control.at-rule.container.css'
+              '1':
+                'name': 'punctuation.definition.keyword.css'
+            'end': '(?=\\s*[{;])'
+            'name': 'meta.at-rule.container.header.css'
+            'patterns': [
+              {
+                'include': '#container-query'
+              }
+            ]
+          }
+          {
+            'begin': '{'
+            'beginCaptures':
+              '0':
+                'name': 'punctuation.section.container.begin.bracket.curly.css'
+            'end': '}'
+            'endCaptures':
+              '0':
+                'name': 'punctuation.section.container.end.bracket.curly.css'
+            'name': 'meta.at-rule.container.body.css'
+            'patterns': [
+              {
+                'include': '#rule-list-innards'
+              }
+              {
+                'include': '$self'
+              }
+            ]
+          }
+        ]
+      }
+      {
         # Single line @custom-at-rule terminated with `;`, such as
         # @my-rule foo bar;
         'begin': '(?i)(?=@[\\w-]+[^;]+;\s*$)'
@@ -1589,11 +1630,340 @@
         | standalone
         | minimal-ui
         | browser
+        | picture-in-picture
         | hover
+        | none                      # Interaction / preference values
+        | coarse
+        | fine
+        | slow
+        | fast
+        | light                     # prefers-color-scheme
+        | dark
+        | no-preference             # prefers-* neutral value
+        | reduce                    # prefers-reduced-*
+        | more                      # prefers-contrast
+        | less
+        | custom
+        | active                    # forced-colors / scripting
+        | inactive
+        | enabled
+        | initial-only
+        | srgb                      # color-gamut
+        | p3
+        | rec2020
+        | standard                  # dynamic-range
+        | high
+        | scroll                    # overflow-block / overflow-inline
+        | paged
+        | inverted                  # inverted-colors
+        | back                      # nav-controls
+        | opaque                    # environment-blending
+        | additive
+        | subtractive
       )
       (?=\\s|\\)|$)
     '''
     'name': 'support.constant.property-value.css'
+  'container-query':
+    'begin': '\\G'
+    'end': '(?=\\s*[{;])'
+    'patterns': [
+      {
+        'include': '#comment-block'
+      }
+      {
+        'include': '#escapes'
+      }
+      {
+        'match': '(?i)(?<=\\s|^|\\*/|\\))(and|or|not)(?=\\s|\\(|/\\*|$)'
+        'name': 'keyword.operator.logical.$1.container.css'
+      }
+      {
+        # style() queries, e.g. @container style(--theme: dark)
+        'begin': '(?i)(?<![\\w-])(style)(\\()'
+        'beginCaptures':
+          '1':
+            'name': 'support.function.style.css'
+          '2':
+            'name': 'punctuation.section.function.begin.bracket.round.css'
+        # style() takes a `<declaration-value>`, in which a `{` is legal, so
+        # this region carries no brace bail-out. It still recovers, because
+        # the declaration-value copy below releases at an unclosed brace.
+        'end': '\\)'
+        'endCaptures':
+          '0':
+            'name': 'punctuation.section.function.end.bracket.round.css'
+        'name': 'meta.function.style.css'
+        'patterns': [
+          {
+            # Local copy of the declaration-value region from #rule-list-innards,
+            # which ends only at `;`, `}` or `)`. A `{` that truncates the query
+            # therefore stays inside the value there, hiding it from the
+            # enclosing bail-out lookahead, which can then only fire at end of
+            # line -- and vscode-textmate pops one rule per line boundary, so
+            # the following rule is left inside the unclosed query. This copy
+            # releases at that `{` instead. The same lexical bail-out applies,
+            # so a balanced `{...}` block in a custom property value, which
+            # #property-values handles, is still left intact.
+            'begin': '(:)\\s*'
+            'beginCaptures':
+              '1':
+                'name': 'punctuation.separator.key-value.css'
+            'end': '\\s*(?=[})])'
+            'contentName': 'meta.property-value.css'
+            'patterns': [
+              {
+                'include': '#comment-block'
+              }
+              {
+                'include': '#property-values'
+              }
+            ]
+          }
+          {
+            'include': '#rule-list-innards'
+          }
+        ]
+      }
+      {
+        # Scroll-state queries, e.g. @container scroll-state(stuck: top)
+        'begin': '(?i)(?<![\\w-])(scroll-state)(\\()'
+        'beginCaptures':
+          '1':
+            'name': 'support.function.scroll-state.css'
+          '2':
+            'name': 'punctuation.section.function.begin.bracket.round.css'
+        # Bail out at a `{` that is not closed before the next brace. A
+        # balanced block is legal here as `<general-enclosed>`, so it stays;
+        # an unclosed one is not, and the base grammar already recovers from
+        # it, so keeping it would scope worse than no change at all. The test
+        # is a balanced block rather than a `)` further along the line, which
+        # would re-scan the tail at every brace. `;` is deliberately not a
+        # bail-out: `<any-value>` permits a top-level one, and a prelude may
+        # span lines, so a `;` here is not evidence of a mistake.
+        'end': '(\\))|(?=\\{(?![^{}]*\\}))'
+        'endCaptures':
+          '1':
+            'name': 'punctuation.section.function.end.bracket.round.css'
+        'name': 'meta.function.scroll-state.css'
+        'patterns': [
+          {
+            'include': '#scroll-state-condition'
+          }
+        ]
+      }
+      {
+        'begin': '\\('
+        'beginCaptures':
+          '0':
+            'name': 'punctuation.definition.parameters.begin.bracket.round.css'
+        # Bail out at a `{` that is not closed before the next brace. A
+        # balanced block is legal here as `<general-enclosed>`, so it stays;
+        # an unclosed one is not, and the base grammar already recovers from
+        # it, so keeping it would scope worse than no change at all. The test
+        # is a balanced block rather than a `)` further along the line, which
+        # would re-scan the tail at every brace. `;` is deliberately not a
+        # bail-out: `<any-value>` permits a top-level one, and a prelude may
+        # span lines, so a `;` here is not evidence of a mistake.
+        'end': '(\\))|(?=\\{(?![^{}]*\\}))'
+        'endCaptures':
+          '1':
+            'name': 'punctuation.definition.parameters.end.bracket.round.css'
+        'patterns': [
+          {
+            'include': '#size-container-features'
+          }
+          {
+            'match': '(?i)(?<=\\s|^|\\*/|\\()(and|or|not)(?=\\s|\\(|/\\*|$)'
+            'name': 'keyword.operator.logical.$1.container.css'
+          }
+          {
+            'match': ':'
+            'name': 'punctuation.separator.key-value.css'
+          }
+          {
+            'match': '>=|<=|=|<|>'
+            'name': 'keyword.operator.comparison.css'
+          }
+          {
+            'captures':
+              '1':
+                'name': 'constant.numeric.css'
+              '2':
+                'name': 'keyword.operator.arithmetic.css'
+              '3':
+                'name': 'constant.numeric.css'
+            'match': '(\\d+)\\s*(/)\\s*(\\d+)'
+            'name': 'meta.ratio.css'
+          }
+          {
+            'include': '#media-feature-keywords'
+          }
+          {
+            'include': '#numeric-values'
+          }
+          {
+            'include': '#comment-block'
+          }
+          {
+            'include': '#functions'
+          }
+        ]
+      }
+      {
+        # Optional container name preceding the query, e.g. @container card (…)
+        'captures':
+          '0':
+            'patterns': [
+              {
+                'include': '#escapes'
+              }
+            ]
+        'match': '''(?xi)
+          (?<=^|\\s|\\*/)
+          (?!(?:none|and|or|not|style)(?![\\w-])) # Not a reserved keyword or style() query
+          (?:[-a-zA-Z_]    | [^\\x00-\\x7F])     # First letter
+          (?:[-a-zA-Z0-9_] | [^\\x00-\\x7F]      # Remainder of identifier
+            |\\\\(?:[0-9a-fA-F]{1,6}|.)
+          )*
+          (?![\\w(-])                            # Not a function call
+        '''
+        'name': 'variable.parameter.container-name.css'
+      }
+    ]
+  'size-container-features':
+    'captures':
+      '1':
+        'name': 'support.type.property-name.container.css'
+    'match': '''(?xi)
+      (?<=^|\\s|\\(|\\*/)           # Preceded by whitespace, bracket or comment
+      (
+        (?:min-|max-)?              # Range features
+        (?: width
+          | height
+          | inline-size
+          | block-size
+          | aspect-ratio
+        )
+        | orientation               # Discrete features
+      )
+      (?=\\s|$|[><:=]|\\)|/\\*)     # Terminates cleanly
+    '''
+  'scroll-state-condition':
+    'patterns': [
+      {
+        'include': '#comment-block'
+      }
+      {
+        'begin': '\\('
+        'beginCaptures':
+          '0':
+            'name': 'punctuation.definition.parameters.begin.bracket.round.css'
+        # Bail out at a `{` that is not closed before the next brace: a
+        # balanced block is legal here as `<general-enclosed>` and stays, an
+        # unclosed one is not. Testing for a balanced block rather than for a
+        # `)` further along the line keeps this from re-scanning the tail at
+        # every brace.
+        'end': '(\\))|(?=\\{(?![^{}]*\\}))'
+        'endCaptures':
+          '1':
+            'name': 'punctuation.definition.parameters.end.bracket.round.css'
+        'patterns': [
+          {
+            'include': '#scroll-state-condition'
+          }
+        ]
+      }
+      {
+        'match': '(?i)(?<=\\s|^|\\*/|\\()(and|or|not)(?=\\s|\\(|/\\*|$)'
+        'name': 'keyword.operator.logical.$1.container.css'
+      }
+      {
+        'begin': '(?i)(?<![\\w-])(stuck)(?=\\s*(?:/\\*(?:[^*]|\\*[^/])*\\*/\\s*)*:)'
+        'beginCaptures':
+          '1':
+            'name': 'support.type.property-name.container.css'
+        # A `{` that is not closed before the next brace also releases the
+        # condition. Without this the feature rule owns the brace and the
+        # enclosing scroll-state() region never sees it, so its own bail-out
+        # cannot fire.
+        'end': '(?=\\)|\\{(?![^{}]*\\})|(?:\\s+|(?<=\\*/))(?i:and|or)(?=\\s|\\()|$)'
+        'patterns': [
+          {
+            'include': '#comment-block'
+          }
+          {
+            'match': ':'
+            'name': 'punctuation.separator.key-value.css'
+          }
+          {
+            'match': '(?i)(?<![\\w-])(?:none|top|right|bottom|left|block-start|inline-start|block-end|inline-end)(?![\\w-])'
+            'name': 'support.constant.property-value.css'
+          }
+        ]
+      }
+      {
+        'begin': '(?i)(?<![\\w-])(snapped)(?=\\s*(?:/\\*(?:[^*]|\\*[^/])*\\*/\\s*)*:)'
+        'beginCaptures':
+          '1':
+            'name': 'support.type.property-name.container.css'
+        # A `{` that is not closed before the next brace also releases the
+        # condition. Without this the feature rule owns the brace and the
+        # enclosing scroll-state() region never sees it, so its own bail-out
+        # cannot fire.
+        'end': '(?=\\)|\\{(?![^{}]*\\})|(?:\\s+|(?<=\\*/))(?i:and|or)(?=\\s|\\()|$)'
+        'patterns': [
+          {
+            'include': '#comment-block'
+          }
+          {
+            'match': ':'
+            'name': 'punctuation.separator.key-value.css'
+          }
+          {
+            'match': '(?i)(?<![\\w-])(?:none|x|y|block|inline|both)(?![\\w-])'
+            'name': 'support.constant.property-value.css'
+          }
+        ]
+      }
+      {
+        'begin': '(?i)(?<![\\w-])(scrollable|scrolled)(?=\\s*(?:/\\*(?:[^*]|\\*[^/])*\\*/\\s*)*:)'
+        'beginCaptures':
+          '1':
+            'name': 'support.type.property-name.container.css'
+        # A `{` that is not closed before the next brace also releases the
+        # condition. Without this the feature rule owns the brace and the
+        # enclosing scroll-state() region never sees it, so its own bail-out
+        # cannot fire.
+        'end': '(?=\\)|\\{(?![^{}]*\\})|(?:\\s+|(?<=\\*/))(?i:and|or)(?=\\s|\\()|$)'
+        'patterns': [
+          {
+            'include': '#comment-block'
+          }
+          {
+            'match': ':'
+            'name': 'punctuation.separator.key-value.css'
+          }
+          {
+            'match': '(?i)(?<![\\w-])(?:none|top|right|bottom|left|block-start|inline-start|block-end|inline-end|x|y|block|inline)(?![\\w-])'
+            'name': 'support.constant.property-value.css'
+          }
+        ]
+      }
+      {
+        # Scroll-state features are also valid in boolean context.
+        'match': '''(?xi)
+          (?<![\\w-])
+          (stuck|snapped|scrollable|scrolled)
+          (?![\\w-])
+          (?=
+            \\s*(?:/\\*(?:[^*]|\\*[^/])*\\*/\\s*)*
+            (?:\\)|(?:and|or)(?=\\s|\\()|$)
+          )
+        '''
+        'name': 'support.type.property-name.container.css'
+      }
+    ]
   'media-query':
     'begin': '\\G'
     'end': '(?=\\s*[{;])'
