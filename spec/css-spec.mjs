@@ -4994,6 +4994,24 @@ describe('CSS grammar', function () {
 			var lines = testGrammar.tokenizeLines('a { padding: env(\n.after > p { color: red; }');
 			assert.deepStrictEqual(lines[1].filter(t => t.scopes.includes('variable.argument.css')).map(t => t.value), ['after']);
 		});
+		it('closes anchor() and anchor-size()', function () {
+			// The closing parenthesis of the anchor rule was the one part of
+			// it no test asserted, so its scope could be renamed freely.
+			var tokens = testGrammar.tokenizeLine('a { top: anchor(--x bottom); width: anchor-size(--x width); }').tokens;
+			[12, 23].forEach(function (index) {
+				assert.deepStrictEqual(tokens[index], {
+					scopes: [
+						'source.css',
+						'meta.property-list.css',
+						'meta.property-value.css',
+						'meta.function.anchor.css',
+						'punctuation.section.function.end.bracket.round.css'
+					],
+					value: ')'
+				}, 'token ' + index);
+			});
+		});
+
 		it('tokenizes anchor() and anchor-size()', function () {
 			var tokens;
 			tokens = testGrammar.tokenizeLine('a { top: anchor(--x bottom); }').tokens;
