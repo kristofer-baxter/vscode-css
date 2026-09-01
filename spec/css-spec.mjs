@@ -4275,6 +4275,64 @@ describe('CSS grammar', function () {
 				assert.ok(!tokens.find(x => x.scopes.includes('support.type.property-name.container.css')), identifier);
 			});
 		});
+		it('scopes both braces of a @container body', function () {
+			// The opening brace is covered by the omitted-prelude test, but
+			// nothing pinned the closing one, so it could be renamed without
+			// any test failing. Every other at-rule with a body asserts both.
+			var tokens = testGrammar.tokenizeLine('@container (width > 1px) { .x { color: red; } }').tokens;
+			assert.deepStrictEqual(tokens[12], {
+				scopes: [
+					'source.css',
+					'meta.at-rule.container.body.css',
+					'punctuation.section.container.begin.bracket.curly.css'
+				],
+				value: '{'
+			});
+			assert.deepStrictEqual(tokens[27], {
+				scopes: [
+					'source.css',
+					'meta.at-rule.container.body.css',
+					'punctuation.section.container.end.bracket.curly.css'
+				],
+				value: '}'
+			});
+		});
+
+		it('does not treat a longer identifier as a size feature', function () {
+			// The size feature names have to stop at a word boundary, or
+			// `widthish` picks up `support.type.property-name.container.css`
+			// from the `width` alternative.
+			var tokens = testGrammar.tokenizeLine('@container (widthish > 10px) {}').tokens;
+			assert.deepStrictEqual(tokens[4], {
+				scopes: ['source.css', 'meta.at-rule.container.header.css'],
+				value: 'widthish '
+			});
+		});
+
+		it('scopes both parentheses of a grouped scroll-state() condition', function () {
+			// The inner group and the function call close with different
+			// punctuation scopes; neither closing parenthesis was pinned.
+			var tokens = testGrammar.tokenizeLine('@container scroll-state((stuck: top)) {}').tokens;
+			assert.deepStrictEqual(tokens[10], {
+				scopes: [
+					'source.css',
+					'meta.at-rule.container.header.css',
+					'meta.function.scroll-state.css',
+					'punctuation.definition.parameters.end.bracket.round.css'
+				],
+				value: ')'
+			});
+			assert.deepStrictEqual(tokens[11], {
+				scopes: [
+					'source.css',
+					'meta.at-rule.container.header.css',
+					'meta.function.scroll-state.css',
+					'punctuation.section.function.end.bracket.round.css'
+				],
+				value: ')'
+			});
+		});
+
 		it('does not tokenize reserved container names', function () {
 			var tokens = testGrammar.tokenizeLine('@container none (width > 10px) {').tokens;
 			assert.ok(!tokens.find(x => x.value === 'none' && x.scopes.includes('variable.parameter.container-name.css')));
