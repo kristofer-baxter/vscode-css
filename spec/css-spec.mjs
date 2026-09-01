@@ -4604,6 +4604,109 @@ describe('CSS grammar', function () {
 			assert.deepStrictEqual(nested.find(t => t.value === 'has').scopes, ['source.css', 'meta.at-rule.scope.header.css', 'meta.scope.start.css', 'entity.other.attribute-name.pseudo-class.css']);
 			assert.deepStrictEqual(nested.find(t => t.value === 'b').scopes, ['source.css', 'meta.at-rule.scope.header.css', 'meta.scope.limit.css', 'entity.other.attribute-name.class.css']);
 		});
+		it('parses the body of a @starting-style rule', function () {
+			// The only existing assertion was on the at-keyword, so the whole
+			// body could be emptied without a test failing.
+			var tokens = testGrammar.tokenizeLine('@starting-style { .z { opacity: 0; } }').tokens;
+			assert.deepStrictEqual(tokens[3], {
+				scopes: [
+					'source.css',
+					'meta.at-rule.starting-style.body.css',
+					'punctuation.section.starting-style.begin.bracket.curly.css'
+				],
+				value: '{'
+			});
+			assert.deepStrictEqual(tokens[6], {
+				scopes: [
+					'source.css',
+					'meta.at-rule.starting-style.body.css',
+					'meta.selector.css',
+					'entity.other.attribute-name.class.css'
+				],
+				value: 'z'
+			});
+			assert.deepStrictEqual(tokens[10], {
+				scopes: [
+					'source.css',
+					'meta.at-rule.starting-style.body.css',
+					'meta.property-list.css',
+					'meta.property-name.css',
+					'support.type.property-name.css'
+				],
+				value: 'opacity'
+			});
+			assert.deepStrictEqual(tokens[18], {
+				scopes: [
+					'source.css',
+					'meta.at-rule.starting-style.body.css',
+					'punctuation.section.starting-style.end.bracket.curly.css'
+				],
+				value: '}'
+			});
+		});
+
+		it('scopes the closing brace of a @scope body', function () {
+			var tokens = testGrammar.tokenizeLine('@scope (.a) { .x { color: red; } }').tokens;
+			assert.deepStrictEqual(tokens[23], {
+				scopes: [
+					'source.css',
+					'meta.at-rule.scope.body.css',
+					'punctuation.section.scope.end.bracket.curly.css'
+				],
+				value: '}'
+			});
+		});
+
+		it('tokenizes @property descriptor values and closes its body', function () {
+			// The existing test asserted the descriptor names but none of
+			// their values, so `initial-value` and the generic value path
+			// could both be removed without a failure.
+			var lines = testGrammar.tokenizeLines('@property --x {\n  syntax: "*";\n  inherits: false;\n  initial-value: red;\n}');
+			assert.deepStrictEqual(lines[1][5], {
+				scopes: [
+					'source.css',
+					'meta.at-rule.property.body.css',
+					'meta.property-value.css',
+					'string.quoted.double.css'
+				],
+				value: '*'
+			});
+			assert.deepStrictEqual(lines[2][4], {
+				scopes: [
+					'source.css',
+					'meta.at-rule.property.body.css',
+					'meta.property-value.css'
+				],
+				value: 'false'
+			});
+			assert.deepStrictEqual(lines[3][1], {
+				scopes: [
+					'source.css',
+					'meta.at-rule.property.body.css',
+					'meta.property-name.css',
+					'support.type.property-name.css'
+				],
+				value: 'initial-value'
+			});
+			assert.deepStrictEqual(lines[3][4], {
+				scopes: [
+					'source.css',
+					'meta.at-rule.property.body.css',
+					'meta.property-value.css',
+					'support.constant.color.w3c-standard-color-name.css'
+				],
+				value: 'red'
+			});
+			assert.deepStrictEqual(lines[4][0], {
+				scopes: [
+					'source.css',
+					'meta.at-rule.property.body.css',
+					'punctuation.section.property-list.end.bracket.curly.css'
+				],
+				value: '}'
+			});
+		});
+
 		it('tokenizes @starting-style', function () {
 			var tokens;
 			tokens = testGrammar.tokenizeLine('@starting-style { .z { opacity: 0; } }').tokens;
