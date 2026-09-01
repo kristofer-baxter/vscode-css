@@ -3864,4 +3864,341 @@ describe('CSS grammar', function () {
 			assert.deepStrictEqual(tokens[22], { scopes: ['source.css', 'meta.property-list.css', 'meta.property-value.css', 'meta.function.misc.css', 'punctuation.section.function.end.bracket.round.css'], value: ')' });
 		});
 	});
+
+	describe('container queries', function () {
+		it('does not treat a longer identifier as a size feature', function () {
+			// The size feature names have to stop at a word boundary, or
+			// `widthish` picks up `support.type.property-name.container.css`
+			// from the `width` alternative.
+			var tokens = testGrammar.tokenizeLine('@container (widthish > 10px) {}').tokens;
+			assert.deepStrictEqual(tokens[4], {
+				scopes: ['source.css', 'meta.at-rule.container.header.css'],
+				value: 'widthish '
+			});
+		});
+
+		it('scopes both braces of a @container body', function () {
+			// The opening brace is covered by the omitted-prelude test, but
+			// nothing pinned the closing one, so it could be renamed without
+			// any test failing. Every other at-rule with a body asserts both.
+			var tokens = testGrammar.tokenizeLine('@container (width > 1px) { .x { color: red; } }').tokens;
+			assert.deepStrictEqual(tokens[12], {
+				scopes: [
+					'source.css',
+					'meta.at-rule.container.body.css',
+					'punctuation.section.container.begin.bracket.curly.css'
+				],
+				value: '{'
+			});
+			assert.deepStrictEqual(tokens[27], {
+				scopes: [
+					'source.css',
+					'meta.at-rule.container.body.css',
+					'punctuation.section.container.end.bracket.curly.css'
+				],
+				value: '}'
+			});
+		});
+
+		it('scopes both parentheses of a grouped scroll-state() condition', function () {
+			// The inner group and the function call close with different
+			// punctuation scopes; neither closing parenthesis was pinned.
+			var tokens = testGrammar.tokenizeLine('@container scroll-state((stuck: top)) {}').tokens;
+			assert.deepStrictEqual(tokens[10], {
+				scopes: [
+					'source.css',
+					'meta.at-rule.container.header.css',
+					'meta.function.scroll-state.css',
+					'punctuation.definition.parameters.end.bracket.round.css'
+				],
+				value: ')'
+			});
+			assert.deepStrictEqual(tokens[11], {
+				scopes: [
+					'source.css',
+					'meta.at-rule.container.header.css',
+					'meta.function.scroll-state.css',
+					'punctuation.section.function.end.bracket.round.css'
+				],
+				value: ')'
+			});
+		});
+
+		it('supports comments between scroll-state conditions', function () {
+			var tokens = testGrammar.tokenizeLine('@container scroll-state(stuck: top/* c */and (snapped: x)) {').tokens;
+			assert.deepStrictEqual(tokens.find(x => x.value === 'and').scopes, ['source.css', 'meta.at-rule.container.header.css', 'meta.function.scroll-state.css', 'keyword.operator.logical.and.container.css']);
+			assert.deepStrictEqual(tokens.find(x => x.value === 'snapped').scopes, ['source.css', 'meta.at-rule.container.header.css', 'meta.function.scroll-state.css', 'support.type.property-name.container.css']);
+			assert.deepStrictEqual(tokens.find(x => x.value === 'x').scopes, ['source.css', 'meta.at-rule.container.header.css', 'meta.function.scroll-state.css', 'support.constant.property-value.css']);
+		});
+
+		it('tokenizes @container logical operators', function () {
+			var tokens;
+			tokens = testGrammar.tokenizeLine('@container (min-width: 400px) and (max-width: 900px) {').tokens;
+			var and = tokens.find(t => t.value === 'and');
+			assert.deepStrictEqual(and.scopes, ['source.css', 'meta.at-rule.container.header.css', 'keyword.operator.logical.and.container.css']);
+		});
+
+		it('tokenizes @container scroll-state() queries', function () {
+			var tokens = testGrammar.tokenizeLine('@container scroll-state(stuck: block-start) {').tokens;
+			assert.deepStrictEqual(tokens.find(x => x.value === 'scroll-state').scopes, ['source.css', 'meta.at-rule.container.header.css', 'meta.function.scroll-state.css', 'support.function.scroll-state.css']);
+			assert.deepStrictEqual(tokens.find(x => x.value === 'stuck').scopes, ['source.css', 'meta.at-rule.container.header.css', 'meta.function.scroll-state.css', 'support.type.property-name.container.css']);
+			assert.deepStrictEqual(tokens.find(x => x.value === 'block-start').scopes, ['source.css', 'meta.at-rule.container.header.css', 'meta.function.scroll-state.css', 'support.constant.property-value.css']);
+		});
+
+		it('tokenizes @container style() queries', function () {
+			var tokens;
+			tokens = testGrammar.tokenizeLine('@container style(--theme: dark) {').tokens;
+			assert.deepStrictEqual(tokens[3], { scopes: ['source.css', 'meta.at-rule.container.header.css', 'meta.function.style.css', 'support.function.style.css'], value: 'style' });
+		});
+
+		it('tokenizes @container with a container name', function () {
+			var tokens;
+			tokens = testGrammar.tokenizeLine('@container card (min-width: 400px) { .x { color: red; } }').tokens;
+			assert.deepStrictEqual(tokens[0], { scopes: ['source.css', 'meta.at-rule.container.header.css', 'keyword.control.at-rule.container.css', 'punctuation.definition.keyword.css'], value: '@' });
+			assert.deepStrictEqual(tokens[1], { scopes: ['source.css', 'meta.at-rule.container.header.css', 'keyword.control.at-rule.container.css'], value: 'container' });
+			assert.deepStrictEqual(tokens[3], { scopes: ['source.css', 'meta.at-rule.container.header.css', 'variable.parameter.container-name.css'], value: 'card' });
+			assert.deepStrictEqual(tokens[5], { scopes: ['source.css', 'meta.at-rule.container.header.css', 'punctuation.definition.parameters.begin.bracket.round.css'], value: '(' });
+			assert.deepStrictEqual(tokens[6], { scopes: ['source.css', 'meta.at-rule.container.header.css', 'support.type.property-name.container.css'], value: 'min-width' });
+		});
+
+		it('tokenizes grouped @container scroll-state() conditions', function () {
+			var tokens = testGrammar.tokenizeLine('@container scroll-state((stuck: top) or (scrolled: block-start)) {').tokens;
+			assert.deepStrictEqual(tokens.find(x => x.value === 'or').scopes, ['source.css', 'meta.at-rule.container.header.css', 'meta.function.scroll-state.css', 'keyword.operator.logical.or.container.css']);
+			assert.deepStrictEqual(tokens.find(x => x.value === 'scrolled').scopes, ['source.css', 'meta.at-rule.container.header.css', 'meta.function.scroll-state.css', 'support.type.property-name.container.css']);
+			assert.deepStrictEqual(tokens.find(x => x.value === 'block-start').scopes, ['source.css', 'meta.at-rule.container.header.css', 'meta.function.scroll-state.css', 'support.constant.property-value.css']);
+		});
+
+		it('tokenizes scroll-state features in boolean context', function () {
+			var tokens = testGrammar.tokenizeLine('@container scroll-state((stuck) or snapped) {').tokens;
+			assert.deepStrictEqual(tokens.find(x => x.value === 'stuck').scopes, ['source.css', 'meta.at-rule.container.header.css', 'meta.function.scroll-state.css', 'support.type.property-name.container.css']);
+			assert.deepStrictEqual(tokens.find(x => x.value === 'snapped').scopes, ['source.css', 'meta.at-rule.container.header.css', 'meta.function.scroll-state.css', 'support.type.property-name.container.css']);
+		});
+
+		it('uses distinct size and scroll-state feature grammars', function () {
+			var tokens = testGrammar.tokenizeLine('@container (width > 10px) {').tokens;
+			assert.deepStrictEqual(tokens.find(x => x.value === 'width').scopes, ['source.css', 'meta.at-rule.container.header.css', 'support.type.property-name.container.css']);
+
+			tokens = testGrammar.tokenizeLine('@container (stuck: top) {').tokens;
+			assert.deepStrictEqual(tokens.find(x => x.value === 'stuck').scopes, ['source.css', 'meta.at-rule.container.header.css']);
+
+			tokens = testGrammar.tokenizeLine('@container scroll-state(width: 10px) {').tokens;
+			assert.deepStrictEqual(tokens.find(x => x.value.includes('width')).scopes, ['source.css', 'meta.at-rule.container.header.css', 'meta.function.scroll-state.css']);
+		});
+
+		it('uses values associated with each scroll-state feature', function () {
+			var tokens = testGrammar.tokenizeLine('@container scroll-state((stuck: top) and (snapped: both) and (scrollable: inline)) {').tokens;
+			assert.deepStrictEqual(tokens.find(x => x.value === 'top').scopes, ['source.css', 'meta.at-rule.container.header.css', 'meta.function.scroll-state.css', 'support.constant.property-value.css']);
+			assert.deepStrictEqual(tokens.find(x => x.value === 'both').scopes, ['source.css', 'meta.at-rule.container.header.css', 'meta.function.scroll-state.css', 'support.constant.property-value.css']);
+			assert.deepStrictEqual(tokens.find(x => x.value === 'inline').scopes, ['source.css', 'meta.at-rule.container.header.css', 'meta.function.scroll-state.css', 'support.constant.property-value.css']);
+
+			tokens = testGrammar.tokenizeLine('@container scroll-state(stuck: x) {').tokens;
+			assert.deepStrictEqual(tokens.find(x => x.value.trim() === 'x').scopes, ['source.css', 'meta.at-rule.container.header.css', 'meta.function.scroll-state.css']);
+		});
+
+		it('keeps a prelude that is merely continued on the next line intact', function () {
+			// A prelude may legally span lines until its `{`, so a bare
+			// unterminated one must keep running -- exactly as an unterminated
+			// `@media` or `@supports` prelude has always done. Only a `{` that
+			// ends the line is treated as evidence of a mistake. Asserted so
+			// that a future change to this behaviour is a deliberate one.
+			var lines = testGrammar.tokenizeLines('@container style(--theme: dark\n.after { color: red; }');
+			assert.deepStrictEqual(lines[1].find(t => t.value.trim() === '.after').scopes, ['source.css', 'meta.at-rule.container.header.css', 'meta.function.style.css', 'meta.property-value.css']);
+		});
+
+		it('keeps a legal balanced block inside a condition in the header', function () {
+			// `<general-enclosed>` is `( <any-value>? )` and `<any-value>` admits
+			// a balanced block, so these must stay inside the header.
+			[
+				['@media ({ future }) {', 'meta.at-rule.media.header.css'],
+				['@container ({ future }) {', 'meta.at-rule.container.header.css']
+			].forEach(function (probe) {
+				var tokens = testGrammar.tokenizeLine(probe[0]).tokens;
+				var future = tokens.find(t => t.value.includes('future'));
+				assert.ok(future, probe[0] + ' -> `future` missing');
+				assert.ok(future.scopes.includes(probe[1]),
+					probe[0] + ' -> left the header: ' + future.scopes.join(' '));
+			});
+		});
+
+		it('keeps a balanced block in a style() query value inside the query', function () {
+			// A custom property value may legally contain a `{...}` block, so the
+			// braces belong to the value and the query continues past them.
+			['@container style(--x: {a})', '@container style(--grid: {display:grid})', '@container style(--x: {a; b})'].forEach(function (prelude) {
+				var lines = testGrammar.tokenizeLines(prelude + ' {\n.z { color: red; }\n}');
+				// The braces must stay inside the value as a group, not be
+				// released to the enclosing query.
+				assert.deepStrictEqual(lines[0].find(t => t.value === '{').scopes, ['source.css', 'meta.at-rule.container.header.css', 'meta.function.style.css', 'meta.property-value.css', 'punctuation.section.group.begin.bracket.curly.css'], prelude);
+				assert.deepStrictEqual(lines[0].filter(t => t.value === '}').pop().scopes, ['source.css', 'meta.at-rule.container.header.css', 'meta.function.style.css', 'meta.property-value.css', 'punctuation.section.group.end.bracket.curly.css'], prelude);
+				assert.deepStrictEqual(lines[0].find(t => t.value === ')').scopes, ['source.css', 'meta.at-rule.container.header.css', 'meta.function.style.css', 'punctuation.section.function.end.bracket.round.css'], prelude);
+				assert.deepStrictEqual(lines[1].find(t => t.value === 'z').scopes, ['source.css', 'meta.at-rule.container.body.css', 'meta.selector.css', 'entity.other.attribute-name.class.css'], prelude);
+			});
+		});
+
+		it('keeps a balanced block in a style() query value across lines', function () {
+			// The same block spanning lines must not be mistaken for the
+			// container body; the rule after the query still belongs to it.
+			var lines = testGrammar.tokenizeLines('@container style(--x: {\n  color: red;\n}) { .z { color: blue; } }');
+			assert.deepStrictEqual(lines[2].find(t => t.value === 'z').scopes, ['source.css', 'meta.at-rule.container.body.css', 'meta.selector.css', 'entity.other.attribute-name.class.css']);
+			assert.deepStrictEqual(lines[2].find(t => t.value === 'blue').scopes, ['source.css', 'meta.at-rule.container.body.css', 'meta.property-list.css', 'meta.property-value.css', 'support.constant.color.w3c-standard-color-name.css']);
+		});
+
+		it('keeps a semicolon or brace that the query itself closes', function () {
+			// `<general-enclosed>` is `( <any-value>? )` and `<any-value>`
+			// permits a top-level `;`, while `<declaration-value>` permits one
+			// inside any balanced block. Neither ends the query, so forward
+			// compatible syntax keeps its scopes.
+			[
+				['@container (future; syntax)', 'meta.at-rule.container.header.css'],
+				['@container (future { syntax })', 'meta.at-rule.container.header.css'],
+				['@container style(--x: [a;b])', 'meta.at-rule.container.header.css'],
+				['@container style(--x: (a;b))', 'meta.at-rule.container.header.css'],
+				['@container style(foo(a;b))', 'meta.at-rule.container.header.css'],
+				['@container style((foo;bar))', 'meta.at-rule.container.header.css']
+			].forEach(function (probe) {
+				var lines = testGrammar.tokenizeLines(probe[0] + ' {\n.z { color: red; }\n}');
+				var close = lines[0].filter(t => t.value === ')').pop();
+				assert.ok(close.scopes.indexOf(probe[1]) !== -1, probe[0] + ' -> ) left the header: ' + close.scopes.join('|'));
+				assert.deepStrictEqual(lines[1].find(t => t.value === 'z').scopes, ['source.css', 'meta.at-rule.container.body.css', 'meta.selector.css', 'entity.other.attribute-name.class.css'], probe[0]);
+			});
+		});
+
+		it('keeps a style() query that is cut off by a brace inside the query', function () {
+			// `style()` wraps `<declaration-value>`, which may legally contain a
+			// balanced `{...}` block, so a `{` here stays part of the query.
+			var lines = testGrammar.tokenizeLines('@container style(--theme: dark{\n.after { color: red; }\n}');
+			assert.ok(lines[0].find(t => t.value === '{').scopes.includes('meta.at-rule.container.header.css'));
+		});
+
+		it('keeps a brace that the query itself closes, in every region', function () {
+			// One case per region where `<any-value>` or `<declaration-value>`
+			// admits a balanced block. A `{` closed later on the same line
+			// belongs to the query, not to the rule that follows it.
+			[
+				['@container style({a})', 'container'],
+				['@container style(--x: {a})', 'container'],
+				['@container scroll-state({a})', 'container'],
+				['@container scroll-state(stuck: {a})', 'container'],
+				['@container scroll-state(snapped: {a})', 'container'],
+				['@container scroll-state(scrollable: {a})', 'container']
+			].forEach(function (probe) {
+				var lines = testGrammar.tokenizeLines(probe[0] + ' {\n.z { color: red; }\n}');
+				var close = lines[0].filter(t => t.value === ')').pop();
+				assert.ok(close.scopes.indexOf('meta.at-rule.' + probe[1] + '.header.css') !== -1, probe[0] + ' -> ) left the header: ' + close.scopes.join('|'));
+				assert.deepStrictEqual(lines[1].find(t => t.value === 'z').scopes, ['source.css', 'meta.at-rule.' + probe[1] + '.body.css', 'meta.selector.css', 'entity.other.attribute-name.class.css'], probe[0]);
+			});
+		});
+
+		it('scopes a comma between container conditions', function () {
+			var tokens = testGrammar.tokenizeLine('@container card (width > 30em), style(--large: true) {}').tokens;
+			assert.deepStrictEqual(tokens.find(x => x.value === ',').scopes, ['source.css', 'meta.at-rule.container.header.css', 'punctuation.separator.list.comma.css']);
+		});
+
+		it('keeps an escape inside the container name it begins', function () {
+			// `\63 ard` is one custom-ident spelling `card`, so the escape and
+			// the rest of the identifier belong to the same name.
+			var tokens = testGrammar.tokenizeLine('@container \\63 ard (width > 1px) {}').tokens;
+			assert.deepStrictEqual(tokens.find(x => x.value === '\\63').scopes, ['source.css', 'meta.at-rule.container.header.css', 'variable.parameter.container-name.css', 'constant.character.escape.codepoint.css']);
+			assert.deepStrictEqual(tokens.find(x => x.value === ' ard').scopes, ['source.css', 'meta.at-rule.container.header.css', 'variable.parameter.container-name.css']);
+		});
+
+		it('does not take an identifier for a container name unless the condition follows', function () {
+			// Without this the name matcher runs at every identifier in the
+			// prelude, which is both wrong and quadratic.
+			var tokens = testGrammar.tokenizeLine('@container one two (width > 1px) {}').tokens;
+			assert.strictEqual(tokens.filter(x => x.scopes.includes('variable.parameter.container-name.css')).length, 1);
+			assert.deepStrictEqual(tokens.find(x => x.scopes.includes('variable.parameter.container-name.css')).value, 'two');
+		});
+
+		it('nests a query in parentheses instead of closing at the first bracket', function () {
+			var tokens = testGrammar.tokenizeLine('@container ((width > 1px) and (height > 2px)) {}').tokens;
+			var parens = tokens.filter(x => x.value === '(' || x.value === ')');
+			assert.strictEqual(parens.length, 6);
+			parens.forEach(function (t) {
+				assert.ok(t.scopes.includes(t.value === '(' ? 'punctuation.definition.parameters.begin.bracket.round.css' : 'punctuation.definition.parameters.end.bracket.round.css'), JSON.stringify(t));
+			});
+			assert.deepStrictEqual(tokens.find(x => x.value === 'and').scopes, ['source.css', 'meta.at-rule.container.header.css', 'keyword.operator.logical.and.container.css']);
+		});
+
+		it('does not let a bracket inside a string close a general-enclosed query', function () {
+			// `<general-enclosed>` only has to be balanced, and a `)` in a
+			// string is not a bracket.
+			var tokens = testGrammar.tokenizeLine('@container (future(")")) {}').tokens;
+			var inString = tokens.filter(x => x.value === ')' && x.scopes.includes('string.quoted.double.css'));
+			assert.strictEqual(inString.length, 1);
+			assert.deepStrictEqual(tokens[tokens.length - 1].scopes, ['source.css', 'meta.at-rule.container.body.css', 'punctuation.section.container.end.bracket.curly.css']);
+		});
+
+		it('tokenizes a function in a scroll-state feature value', function () {
+			// A feature value is a component value, so `var()` may stand in
+			// for the keyword, and its `)` is not the query's.
+			var tokens = testGrammar.tokenizeLine('@container scroll-state(scrollable: var(--edge, bottom)) {}').tokens;
+			assert.deepStrictEqual(tokens.find(x => x.value === '--edge').scopes, ['source.css', 'meta.at-rule.container.header.css', 'meta.function.scroll-state.css', 'meta.function.variable.css', 'variable.argument.css']);
+			assert.deepStrictEqual(tokens[tokens.length - 1].scopes, ['source.css', 'meta.at-rule.container.body.css', 'punctuation.section.container.end.bracket.curly.css']);
+		});
+
+		it('tokenizes a negated style() query', function () {
+			var tokens = testGrammar.tokenizeLine('@container style(not (--theme: dark)) {}').tokens;
+			assert.deepStrictEqual(tokens.find(x => x.value === 'not').scopes, ['source.css', 'meta.at-rule.container.header.css', 'meta.function.style.css', 'keyword.operator.logical.not.container.css']);
+			assert.deepStrictEqual(tokens.find(x => x.value === '--theme').scopes, ['source.css', 'meta.at-rule.container.header.css', 'meta.function.style.css', 'variable.css']);
+		});
+
+		it('tokenizes a style() range query', function () {
+			// A range is not a declaration, so it must not be read as one.
+			var tokens = testGrammar.tokenizeLine('@container style(--level >= 2) {}').tokens;
+			assert.deepStrictEqual(tokens.find(x => x.value === '>=').scopes, ['source.css', 'meta.at-rule.container.header.css', 'meta.function.style.css', 'keyword.operator.comparison.css']);
+			assert.deepStrictEqual(tokens.find(x => x.value === '2').scopes, ['source.css', 'meta.at-rule.container.header.css', 'meta.function.style.css', 'constant.numeric.css']);
+		});
+
+		it('groups style() queries in parentheses', function () {
+			var tokens = testGrammar.tokenizeLine('@container style((--a: 1) and (--b: 2)) {}').tokens;
+			assert.deepStrictEqual(tokens.find(x => x.value === 'and').scopes, ['source.css', 'meta.at-rule.container.header.css', 'meta.function.style.css', 'keyword.operator.logical.and.container.css']);
+			assert.strictEqual(tokens.filter(x => x.scopes.includes('punctuation.definition.parameters.begin.bracket.round.css')).length, 2);
+		});
+
+		it('leaks a semicolon-terminated container rule, which has no such form', function () {
+			// @container has no semicolon form, so `@container nonsense;` is
+			// malformed and must leak like any other malformed prelude.
+			var lines = testGrammar.tokenizeLines('@container nonsense;\n.after { color: red; }');
+			assert.ok(!lines[1][0].scopes.includes('meta.selector.css'), JSON.stringify(lines[1][0].scopes));
+		});
+
+		it('scopes a style range written without spaces, value first, or chained', function () {
+			[
+				['@container style(--level>=2) {}', '>='],
+				['@container style(2 < --level) {}', '<'],
+				['@container style(1 < --level < 3) {}', '<']
+			].forEach(function (pair) {
+				var tokens = testGrammar.tokenizeLine(pair[0]).tokens;
+				var op = tokens.find(x => x.value.trim() === pair[1]);
+				assert.deepStrictEqual(op.scopes, ['source.css', 'meta.at-rule.container.header.css', 'meta.function.style.css', 'keyword.operator.comparison.css'], pair[0]);
+			});
+			var name = testGrammar.tokenizeLine('@container style(--level>=2) {}').tokens.find(x => x.value === '--level');
+			assert.ok(name, 'the custom property name must not swallow the operator');
+		});
+
+		it('keeps a declaration whose value holds a bracketed semicolon out of the range rule', function () {
+			var tokens = testGrammar.tokenizeLine('@container style(--x: [a;b]) {}').tokens;
+			assert.deepStrictEqual(tokens.find(x => x.value === '--x').scopes, ['source.css', 'meta.at-rule.container.header.css', 'meta.function.style.css', 'variable.css']);
+		});
+
+		it('takes an unknown query function for general-enclosed wherever it is valid', function () {
+			['@container future(foo) {}', '@container (future(foo)) {}', '@container style(future(foo)) {}'].forEach(function (line) {
+				var tokens = testGrammar.tokenizeLine(line).tokens;
+				assert.deepStrictEqual(tokens.find(x => x.value === 'future').scopes.slice(-1), ['support.function.misc.css'], line);
+			});
+		});
+
+		it('reads a logical operator that follows a closing parenthesis', function () {
+			// A `)` already separates the identifier, so no space is required.
+			[
+				['@container (width>1px)and(height>1px) {}', 'and', 'keyword.operator.logical.and.container.css'],
+				['@container style((--a:1)and(--b:2)) {}', 'and', 'keyword.operator.logical.and.container.css'],
+				['@container scroll-state((stuck)or(snapped)) {}', 'or', 'keyword.operator.logical.or.container.css']
+			].forEach(function (t) {
+				var tokens = testGrammar.tokenizeLine(t[0]).tokens;
+				assert.deepStrictEqual(tokens.find(x => x.value === t[1]).scopes.slice(-1), [t[2]], t[0]);
+			});
+		});
+
+	});
 });
