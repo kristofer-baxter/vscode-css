@@ -5201,6 +5201,64 @@ describe('CSS grammar', function () {
 			assert.deepStrictEqual(tokens[2], { scopes: ['source.css', 'meta.selector.css', 'entity.other.attribute-name.pseudo-element.css'], value: 'slotted' });
 			assert.deepStrictEqual(tokens[5], { scopes: ['source.css', 'meta.selector.css', 'entity.other.attribute-name.class.css'], value: 'x' });
 		});
+		it('closes every new functional selector', function () {
+			// Each of these rules is new on this branch and none of them had
+			// its closing parenthesis asserted, so the scope could be renamed
+			// without a failure.
+			[
+				['a:state(loading) {}', 5],
+				['a::part(button) {}', 5],
+				['a::highlight(search) {}', 5],
+				['a::view-transition-old(hero) {}', 5],
+				['a::scroll-button(next) {}', 5],
+				['a::slotted(.x) {}', 6]
+			].forEach(function (pair) {
+				var tokens = testGrammar.tokenizeLine(pair[0]).tokens;
+				assert.deepStrictEqual(tokens[pair[1]], {
+					scopes: [
+						'source.css',
+						'meta.selector.css',
+						'punctuation.section.function.end.bracket.round.css'
+					],
+					value: ')'
+				}, pair[0]);
+			});
+		});
+
+		it('releases the closing parenthesis of an of clause', function () {
+			// `:nth-child(An+B of S)` ends the selector subregion before the
+			// pseudo-class rule closes, and that release was unpinned.
+			var tokens = testGrammar.tokenizeLine('a:nth-child(2 of .x) {}').tokens;
+			assert.deepStrictEqual(tokens[6], {
+				scopes: ['source.css', 'meta.selector.css', 'keyword.operator.logical.of.css'],
+				value: 'of'
+			});
+			assert.deepStrictEqual(tokens[10], {
+				scopes: [
+					'source.css',
+					'meta.selector.css',
+					'punctuation.section.function.end.bracket.round.css'
+				],
+				value: ')'
+			});
+		});
+
+		it('does not treat a longer identifier as a media feature or pseudo-element', function () {
+			// Both name lists have to stop at a word boundary. Without one,
+			// `prefers-color-schemex` and `::markerish` pick up scopes that
+			// belong to the shorter names they start with.
+			var tokens = testGrammar.tokenizeLine('@media (prefers-color-schemex: dark) {}').tokens;
+			assert.deepStrictEqual(tokens[4], {
+				scopes: ['source.css', 'meta.at-rule.media.header.css'],
+				value: 'prefers-color-schemex'
+			});
+			tokens = testGrammar.tokenizeLine('a::markerish {}').tokens;
+			assert.deepStrictEqual(tokens[1], {
+				scopes: ['source.css', 'meta.selector.css'],
+				value: '::markerish'
+			});
+		});
+
 		it('uses the argument grammar for each functional pseudo-element', function () {
 			var tokens = testGrammar.tokenizeLine('a::part(left)::view-transition-old(*)::scroll-button(next)::scroll-button(*) {}').tokens;
 			assert.deepStrictEqual(tokens.find(x => x.value === 'left'), { scopes: ['source.css', 'meta.selector.css', 'variable.parameter.pseudo-element.css'], value: 'left' });
