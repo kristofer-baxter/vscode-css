@@ -3983,6 +3983,52 @@ describe('CSS grammar', function () {
 			});
 		});
 
+		[
+			['miscellaneous function', 'a { --x: clamp(foo', 'bar); color: red; }', []],
+			['nested miscellaneous function', 'a { --x: var(--y, clamp(foo', 'bar)); color: red; }', []],
+			['custom function', 'a { --x: --custom(clamp(foo', 'bar)); color: red; }', []],
+			['calculation', 'a { --x: calc(foo', 'bar); color: red; }', []],
+			['forgiving is selector', 'a:is(.b, :lang(en', ')) { color: red; }', []],
+			['forgiving where selector', 'a:where(.b, :lang(en', ')) { color: red; }', []],
+			['supports selector', '@supports selector(a:lang(en', ')) { a { color: red; } }', ['meta.at-rule.supports.body.css']],
+			['general-enclosed supports condition', '@supports (future :lang(en', ')) { a { color: red; } }', ['meta.at-rule.supports.body.css']],
+			['general-enclosed media condition', '@media (future: clamp(foo', 'bar)) { a { color: red; } }', ['meta.at-rule.media.body.css']],
+			['URL argument', 'a { background: url(foo', 'bar); color: red; }', []],
+			['document argument', '@document url-prefix(foo', 'bar) { a { color: red; } }', ['meta.at-rule.document.body.css']]
+		].forEach(function ([context, prefix, suffix, bodyScopes]) {
+			it('does not continue a non-string backslash-newline in a ' + context, function () {
+				[1, 2, 3, 4, 5, 6].forEach(function (count) {
+					['\n', '\r\n', '\r'].forEach(function (newline) {
+						['', newline].forEach(function (blank) {
+							var source = prefix + '\\'.repeat(count) + newline + blank + suffix + '\n.after { color: blue; }';
+							var lines = testGrammar.tokenizeLines(source);
+							assert.ok(!lines.flat().some(t => t.scopes.includes('constant.character.escape.newline.css')), source);
+							lines.slice(1).flat().forEach(function (token) {
+								assert.ok(!token.scopes.some(s => s.startsWith('constant.character.escape.') || s.startsWith('string.quoted.')), source);
+							});
+							assert.deepStrictEqual(lines.at(-2).find(t => t.value === 'red').scopes,
+								['source.css'].concat(bodyScopes, 'meta.property-list.css', 'meta.property-value.css',
+									'support.constant.color.w3c-standard-color-name.css'), source);
+							assert.deepStrictEqual(lines.at(-1).find(t => t.value === 'after').scopes,
+								['source.css', 'meta.selector.css', 'entity.other.attribute-name.class.css'], source);
+							assert.deepStrictEqual(lines.at(-1).find(t => t.value === 'blue').scopes,
+								['source.css', 'meta.property-list.css', 'meta.property-value.css',
+									'support.constant.color.w3c-standard-color-name.css'], source);
+							assert.deepStrictEqual(testGrammar.scopeStackAtEnd(source), ['source.css'], source);
+						});
+					});
+				});
+			});
+		});
+
+		it('does not open a newline escape at EOF outside a string', function () {
+			['a { --x: clamp(foo', 'a:is(.b, :lang(en', '@import url(foo', '@document url-prefix(foo'].forEach(function (prefix) {
+				var source = prefix + '\\';
+				assert.ok(!testGrammar.scopeStackAtEnd(source).includes('constant.character.escape.newline.css'), source);
+				assert.ok(!testGrammar.tokenizeLine(source).tokens.some(t => t.scopes.includes('constant.character.escape.newline.css')), source);
+			});
+		});
+
 		it('recognizes function comments before arithmetic and unquoted arguments', function () {
 			[
 				['a { width: calc(1px', ' + 1px); color: red; }'],

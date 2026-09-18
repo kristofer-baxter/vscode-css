@@ -845,11 +845,6 @@
         'name': 'constant.character.escape.codepoint.css'
       }
       {
-        'begin': '\\\\$\\s*'
-        'end': '^(?<!\\G)'
-        'name': 'constant.character.escape.newline.css'
-      }
-      {
         'match': '\\\\.'
         'name': 'constant.character.escape.css'
       }
@@ -868,8 +863,7 @@
         'name': 'constant.character.escape.codepoint.css'
       }
       {
-        # Unlike the shared ^(?<!\\G), ^ releases the escape at the start
-        # of the next line even while the enclosing string is open.
+        # Only quoted strings allow backslash-newline continuation.
         'begin': '\\\\$\\s*'
         'end': '^'
         'name': 'constant.character.escape.newline.css'
