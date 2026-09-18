@@ -3865,6 +3865,247 @@ describe('CSS grammar', function () {
 		});
 	});
 	describe('bounded recovery and condition strings', function () {
+		it('keeps escaped quotes in media identifiers out of string regions', function () {
+			['"', "'"].forEach(function (quote) {
+				['\\', '\\\\\\'].forEach(function (escape) {
+					['foo' + escape + quote + 'bar', '{foo' + escape + quote + 'bar}', 'future(foo' + escape + quote + 'bar)'].forEach(function (value) {
+						[
+							'@media (future: ' + value + ') { .inside { color: red; } }\n.after { color: blue; }',
+							'@import "a.css" (future: ' + value + ');\n.after { color: blue; }'
+						].forEach(function (source) {
+							var lines = testGrammar.tokenizeLines(source);
+							assert.ok(!lines[0].some(t => t.value.includes('bar') && t.scopes.some(s => s.startsWith('string.quoted.'))), source);
+							if (source.startsWith('@media')) {
+								assert.deepStrictEqual(lines[0].find(t => t.value === 'red').scopes,
+									['source.css', 'meta.at-rule.media.body.css', 'meta.property-list.css',
+										'meta.property-value.css', 'support.constant.color.w3c-standard-color-name.css'], source);
+							}
+							assert.deepStrictEqual(lines[1].find(t => t.value === 'after').scopes,
+								['source.css', 'meta.selector.css', 'entity.other.attribute-name.class.css'], source);
+							assert.deepStrictEqual(testGrammar.scopeStackAtEnd(source), ['source.css'], source);
+						});
+					});
+				});
+			});
+		});
+
+		it('opens media strings after an even number of backslashes', function () {
+			['"', "'"].forEach(function (quote) {
+				[2, 4, 6].forEach(function (count) {
+					var source = '@media (future: foo' + '\\'.repeat(count) + quote + ')};{' + quote + ') { a { color: red; } }';
+					var tokens = testGrammar.tokenizeLine(source).tokens;
+					assert.ok(tokens.find(t => t.value === ')};{').scopes.some(s => s.startsWith('string.quoted.')), source);
+					assert.ok(tokens.find(t => t.value === 'red').scopes.includes('support.constant.color.w3c-standard-color-name.css'), source);
+					assert.deepStrictEqual(testGrammar.scopeStackAtEnd(source), ['source.css'], source);
+				});
+			});
+		});
+
+		it('protects quotes in multiline language-range comments', function () {
+			['"', "'"].forEach(function (quote) {
+				[
+					'a:lang(en /* ' + quote + '\n' + quote + ' */) { color: red; }',
+					'a:is(:lang(en /* ' + quote + '\n' + quote + ' */)) { color: red; }',
+					'@supports selector(a:lang(en /* ' + quote + '\n' + quote + ' */)) { a { color: red; } }',
+					'@supports (future :lang(en /* ' + quote + '\n' + quote + ' */)) { a { color: red; } }'
+				].forEach(function (rule) {
+					var source = rule + '\n.after { color: blue; }';
+					var lines = testGrammar.tokenizeLines(source);
+					assert.ok(lines[0].at(-1).scopes.includes('comment.block.css'), source);
+					assert.ok(lines[1][0].scopes.includes('comment.block.css'), source);
+					assert.ok(lines[1].find(t => t.value === 'red').scopes.includes('support.constant.color.w3c-standard-color-name.css'), source);
+					assert.deepStrictEqual(lines[2].find(t => t.value === 'after').scopes,
+						['source.css', 'meta.selector.css', 'entity.other.attribute-name.class.css'], source);
+					assert.deepStrictEqual(testGrammar.scopeStackAtEnd(source), ['source.css'], source);
+				});
+			});
+		});
+
+		it('keeps escaped comment openers out of language-range comments', function () {
+			[1, 3, 5].forEach(function (count) {
+				['is', 'where'].forEach(function (name) {
+					var source = 'a:' + name + '(.b, :lang(en' + '\\'.repeat(count) + '/*)) { color: red; }\n.after { color: blue; }';
+					var lines = testGrammar.tokenizeLines(source);
+					assert.ok(!lines.flat().some(t => t.scopes.includes('comment.block.css')), source);
+					assert.ok(lines[0].find(t => t.value === 'red').scopes.includes('support.constant.color.w3c-standard-color-name.css'), source);
+					assert.deepStrictEqual(testGrammar.scopeStackAtEnd(source), ['source.css'], source);
+				});
+				var source = '@supports (future :lang(en' + '\\'.repeat(count) + '/*)) { a { color: red; } }';
+				var tokens = testGrammar.tokenizeLine(source).tokens;
+				assert.ok(!tokens.some(t => t.scopes.includes('comment.block.css')), source);
+				assert.ok(tokens.find(t => t.value === 'red').scopes.includes('support.constant.color.w3c-standard-color-name.css'), source);
+				assert.deepStrictEqual(testGrammar.scopeStackAtEnd(source), ['source.css'], source);
+			});
+		});
+
+		it('recognizes language-range comments after even backslash counts', function () {
+			[2, 4, 6].forEach(function (count) {
+				var source = 'a:is(.b, :lang(en' + '\\'.repeat(count) + '/* "\n\' */)) { color: red; }\n.after { color: blue; }';
+				var lines = testGrammar.tokenizeLines(source);
+				assert.ok(lines[0].at(-1).scopes.includes('comment.block.css'), source);
+				assert.ok(lines[1][0].scopes.includes('comment.block.css'), source);
+				assert.ok(lines[1].find(t => t.value === 'red').scopes.includes('support.constant.color.w3c-standard-color-name.css'), source);
+				assert.deepStrictEqual(testGrammar.scopeStackAtEnd(source), ['source.css'], source);
+			});
+		});
+
+		it('consumes escaped quotes atomically in unquoted function arguments', function () {
+			[
+				['a { background: url(', '); color: red; }'],
+				['@import url(', ');'],
+				['a { --x: --custom(url(', ')); color: red; }'],
+				['a { --x: clamp(', '); color: red; }'],
+				['a { --x: attr(', '); color: red; }'],
+				['a { --x: if(', '); color: red; }'],
+				['a { --x: style(', '); color: red; }'],
+				['a { --x: var(--y, clamp(', ')); color: red; }'],
+				['@document url-prefix(', ') { a { color: red; } }'],
+				['@document domain(', ') { a { color: red; } }'],
+				['@document regexp(', ') { a { color: red; } }']
+			].forEach(function ([prefix, suffix]) {
+				['"', "'"].forEach(function (quote) {
+					[1, 3, 5].forEach(function (count) {
+						['\\65', '\\000065'].forEach(function (escape) {
+							['\n', '\r\n', '\r'].forEach(function (newline) {
+								var source = prefix + 'a' + '\\'.repeat(count) + quote + 'b' + escape + newline + 'c' + suffix + '\n.after { color: blue; }';
+								var lines = testGrammar.tokenizeLines(source);
+								assert.ok(!lines.slice(0, 2).flat().some(t => t.scopes.some(s => s.startsWith('string.quoted.'))), source);
+								if (!prefix.startsWith('@import')) {
+									assert.ok(lines[1].find(t => t.value === 'red').scopes.includes('support.constant.color.w3c-standard-color-name.css'), source);
+								}
+								assert.deepStrictEqual(lines[2].find(t => t.value === 'after').scopes,
+									['source.css', 'meta.selector.css', 'entity.other.attribute-name.class.css'], source);
+								assert.deepStrictEqual(testGrammar.scopeStackAtEnd(source), ['source.css'], source);
+							});
+						});
+					});
+				});
+			});
+		});
+
+		it('recognizes function comments before arithmetic and unquoted arguments', function () {
+			[
+				['a { width: calc(1px', ' + 1px); color: red; }'],
+				['a { width: calc((1px', ' + 1px)); color: red; }'],
+				['a { --x: clamp(foo', '); color: red; }'],
+				['a { --x: attr(foo', '); color: red; }'],
+				['a { --x: if(foo', '); color: red; }'],
+				['a { --x: style(foo', '); color: red; }'],
+				['a { --x: var(--y, clamp(foo', ')); color: red; }']
+			].forEach(function ([prefix, suffix]) {
+				['"', "'"].forEach(function (quote) {
+					['', ' '].forEach(function (space) {
+						['\\65', '\\000065', '\\'].forEach(function (escape) {
+							var source = prefix + space + '/* ' + quote + escape + '\n*/' + suffix + '\n.after { color: blue; }';
+							var lines = testGrammar.tokenizeLines(source);
+							var offset = 0;
+							lines[0].forEach(function (token) {
+								if (offset >= prefix.length + space.length) {
+									assert.ok(token.scopes.includes('comment.block.css'), source + ' -> ' + JSON.stringify(token));
+									assert.ok(!token.scopes.some(s => s.startsWith('string.quoted.')), source);
+								}
+								offset += token.value.length;
+							});
+							assert.ok(lines[1][0].scopes.includes('comment.block.css'), source);
+							assert.ok(lines[1].find(t => t.value === 'red').scopes.includes('support.constant.color.w3c-standard-color-name.css'), source);
+							assert.deepStrictEqual(lines[2].find(t => t.value === 'after').scopes,
+								['source.css', 'meta.selector.css', 'entity.other.attribute-name.class.css'], source);
+							assert.deepStrictEqual(testGrammar.scopeStackAtEnd(source), ['source.css'], source);
+						});
+					});
+				});
+			});
+		});
+
+		it('preserves strings reached through nested functions in conditions', function () {
+			['"', "'"].forEach(function (quote) {
+				['\\65', '\\000065', 'text\\'].forEach(function (escape) {
+					[['calc(', ')'], ['rgb(', ')'], ['var(--x, ', ')'], ['--custom(', ')'],
+						['var(--x, calc(', '))'], ['--custom(rgb(', '))']].forEach(function ([prefix, suffix]) {
+						var value = prefix + quote + 'prefix' + escape + '\n)' + quote + suffix;
+						[
+							'@media (x: ' + value + ') { a { color: red; } }',
+							'@supports (future: ' + value + ') { a { color: red; } }',
+							'@import "a.css" (x: ' + value + ');'
+						].forEach(function (rule) {
+							var source = rule + '\n.after { color: blue; }';
+							var lines = testGrammar.tokenizeLines(source);
+							var closingQuote = lines[1].find(t => t.value === quote);
+							assert.ok(closingQuote, source);
+							assert.equal(closingQuote.scopes.at(-1), 'punctuation.definition.string.end.css', source);
+							assert.ok(lines[1][0].scopes.some(s => s.startsWith('string.quoted.')), source);
+							assert.ok(!lines.flat().some(t => t.scopes.includes('invalid.illegal.unclosed.string.css')), source);
+							if (!source.startsWith('@import')) {
+								var bodyScope = source.startsWith('@media') ? 'meta.at-rule.media.body.css' : 'meta.at-rule.supports.body.css';
+								assert.deepStrictEqual(lines[1].find(t => t.value === 'red').scopes,
+									['source.css', bodyScope, 'meta.property-list.css', 'meta.property-value.css',
+										'support.constant.color.w3c-standard-color-name.css'], source);
+							}
+							assert.deepStrictEqual(lines[2].find(t => t.value === 'after').scopes,
+								['source.css', 'meta.selector.css', 'entity.other.attribute-name.class.css'], source);
+							assert.deepStrictEqual(testGrammar.scopeStackAtEnd(source), ['source.css'], source);
+						});
+					});
+				});
+			});
+		});
+
+		[
+			['property', 'a { content: ', '; }'],
+			['custom property', 'a { --x: ', '; }'],
+			['attribute', 'a[data-x=', '] { color: red; }'],
+			['import', '@import ', ';'],
+			['URL', 'a { background: url(', '); }'],
+			['supports declaration', '@supports (content: ', ') { a { color: red; } }'],
+			['nested function', 'a { --x: var(--y, --custom(calc(', '))); }']
+		].forEach(function ([context, prefix, suffix]) {
+			it('preserves every character of continued strings in a ' + context, function () {
+				['"', "'"].forEach(function (quote) {
+					['\\a', '\\65', '\\abcdef', '\\000065', '\\', '\\\\\\', '\\\\prefix\\65',
+						'\\' + quote + '\\65'].forEach(function (escape) {
+						['\n', '\r\n', '\r'].forEach(function (newline) {
+							var first = quote + 'prefix' + escape;
+							var last = ')};{ tail' + quote;
+							var source = prefix + first + newline + last + suffix + '\n.after { color: blue; }';
+							var lines = testGrammar.tokenizeLines(source);
+							[[0, prefix.length, prefix.length + first.length], [1, 0, last.length]].forEach(function ([line, start, end]) {
+								var offset = 0;
+								lines[line].forEach(function (token) {
+									if (offset < end && offset + token.value.length > start) {
+										assert.ok(token.scopes.some(s => s.startsWith('string.quoted.')), source + ' -> ' + JSON.stringify(token));
+										assert.ok(!token.scopes.includes('invalid.illegal.unclosed.string.css'), source);
+									}
+									offset += token.value.length;
+								});
+							});
+							assert.equal(lines[1].find(t => t.value === quote).scopes.at(-1),
+								'punctuation.definition.string.end.css', source);
+							assert.ok(!lines[1][0].scopes.some(s => s.startsWith('constant.character.escape.')), source);
+							assert.deepStrictEqual(lines[2].find(t => t.value === 'after').scopes,
+								['source.css', 'meta.selector.css', 'entity.other.attribute-name.class.css'], source);
+							assert.deepStrictEqual(testGrammar.scopeStackAtEnd(source), ['source.css'], source);
+						});
+					});
+				});
+			});
+
+			it('retains bad-string diagnostics at an unescaped newline in a ' + context, function () {
+				['"', "'"].forEach(function (quote) {
+					['plain', '\\\\65', '\\0000065', '\\65 ', '\\65\t', '\\65\f'].forEach(function (value) {
+						var source = prefix + quote + 'prefix' + value + '\n' + suffix + '\n.after { color: blue; }';
+						var lines = testGrammar.tokenizeLines(source);
+						assert.ok(lines[0].some(t => t.scopes.includes('invalid.illegal.unclosed.string.css')), source);
+						lines[1].forEach(function (token) {
+							assert.ok(!token.scopes.some(s => s.startsWith('string.quoted.')), source);
+						});
+						assert.deepStrictEqual(lines[2].find(t => t.value === 'after').scopes,
+							['source.css', 'meta.selector.css', 'entity.other.attribute-name.class.css'], source);
+						assert.deepStrictEqual(testGrammar.scopeStackAtEnd(source), ['source.css'], source);
+					});
+				});
+			});
+		});
+
 		it('preserves the three custom-property declarations from the review', function () {
 			var source = [
 				'a {',

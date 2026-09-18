@@ -37,7 +37,7 @@
 ]
 'repository':
   'arithmetic-operators':
-    'match': '[*/]|(?<=\\s|^)[-+](?=\\s|$)'
+    'match': '\\*|/(?!\\*)|(?<=\\s|^)[-+](?=\\s|$)'
     'name': 'keyword.operator.arithmetic.css'
   'at-rules':
     'patterns': [
@@ -334,7 +334,7 @@
                     'include': '#escapes'
                   }
                   {
-                    'match': '[^\'")\\s]+'
+                    'match': '[^\\\\\'")\\s]+'
                     'name': 'variable.parameter.document-rule.css'
                   }
                 ]
@@ -854,43 +854,6 @@
         'name': 'constant.character.escape.css'
       }
     ]
-  # Condition and language strings use local escape rules so a newline
-  # escape ends at the next line without changing other string contexts.
-  'condition-string':
-    'patterns': [
-      {
-        'begin': '"'
-        'beginCaptures':
-          '0':
-            'name': 'punctuation.definition.string.begin.css'
-        'end': '"|(?<!\\\\)(?=$|\\n)'
-        'endCaptures':
-          '0':
-            'name': 'punctuation.definition.string.end.css'
-        'name': 'string.quoted.double.css'
-        'patterns': [
-          {
-            'include': '#string-escapes'
-          }
-        ]
-      }
-      {
-        'begin': '\''
-        'beginCaptures':
-          '0':
-            'name': 'punctuation.definition.string.begin.css'
-        'end': '\'|(?<!\\\\)(?=$|\\n)'
-        'endCaptures':
-          '0':
-            'name': 'punctuation.definition.string.end.css'
-        'name': 'string.quoted.single.css'
-        'patterns': [
-          {
-            'include': '#string-escapes'
-          }
-        ]
-      }
-    ]
   'string-escapes':
     'patterns': [
       {
@@ -928,7 +891,7 @@
     'name': 'meta.feature-query.css'
     'patterns': [
       {
-        'include': '#condition-string'
+        'include': '#string'
       }
       {
         'include': '#feature-query-operators'
@@ -1142,7 +1105,7 @@
             'include': '#property-values'
           }
           {
-            'match': '[^\'"),\\s]+'
+            'match': '(?:[^\\\\\'"),/\\s]|/(?!\\*))+'
             'name': 'variable.parameter.misc.css'
           }
         ]
@@ -1346,6 +1309,12 @@
           '0':
             'name': 'punctuation.section.function.end.bracket.round.css'
         'patterns': [
+          {
+            'include': '#escapes'
+          }
+          {
+            'include': '#comment-block'
+          }
           {
             'match': '(?<=[(,\\s])[a-zA-Z]+(-[a-zA-Z0-9]*|\\\\(?:[0-9a-fA-F]{1,6}|.))*(?=[),\\s])'
             'name': 'support.constant.language-range.css'
@@ -1573,7 +1542,11 @@
             'name': 'punctuation.definition.parameters.end.bracket.round.css'
         'patterns': [
           {
-            'include': '#condition-string'
+            'match': '\\\\.'
+            'name': 'constant.character.escape.css'
+          }
+          {
+            'include': '#string'
           }
           {
             'include': '#media-features'
@@ -2493,17 +2466,17 @@
         'name': 'string.quoted.double.css'
         'patterns': [
           {
-            'begin': '(?:\\G|^)(?=(?:[^\\\\"]|\\\\.)+$)'
+            'begin': '(?:\\G|^)(?!(?:[^\\\\"]|\\\\.)*\\\\[0-9a-fA-F]{1,6}$)(?=(?:[^\\\\"]|\\\\.)+$)'
             'end': '$'
             'name': 'invalid.illegal.unclosed.string.css'
             'patterns': [
               {
-                'include': '#escapes'
+                'include': '#string-escapes'
               }
             ]
           }
           {
-            'include': '#escapes'
+            'include': '#string-escapes'
           }
         ]
       }
@@ -2519,17 +2492,17 @@
         'name': 'string.quoted.single.css'
         'patterns': [
           {
-            'begin': "(?:\\G|^)(?=(?:[^\\\\']|\\\\.)+$)"
+            'begin': "(?:\\G|^)(?!(?:[^\\\\']|\\\\.)*\\\\[0-9a-fA-F]{1,6}$)(?=(?:[^\\\\']|\\\\.)+$)"
             'end': '$'
             'name': 'invalid.illegal.unclosed.string.css'
             'patterns': [
               {
-                'include': '#escapes'
+                'include': '#string-escapes'
               }
             ]
           }
           {
-            'include': '#escapes'
+            'include': '#string-escapes'
           }
         ]
       }
@@ -2591,7 +2564,7 @@
     'name': 'meta.function.url.css'
     'patterns': [
       {
-        'match': '[^\'")\\s]+'
+        'match': '[^\\\\\'")\\s]+'
         'name': 'variable.parameter.url.css'
       }
       {
