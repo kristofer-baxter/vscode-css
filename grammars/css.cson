@@ -854,8 +854,8 @@
         'name': 'constant.character.escape.css'
       }
     ]
-  # Condition strings use a local newline escape so a line continuation
-  # releases at the next line without changing other string contexts.
+  # Condition and language strings use local escape rules so a newline
+  # escape ends at the next line without changing other string contexts.
   'condition-string':
     'patterns': [
       {
@@ -870,7 +870,7 @@
         'name': 'string.quoted.double.css'
         'patterns': [
           {
-            'include': '#condition-string-escapes'
+            'include': '#string-escapes'
           }
         ]
       }
@@ -886,20 +886,27 @@
         'name': 'string.quoted.single.css'
         'patterns': [
           {
-            'include': '#condition-string-escapes'
+            'include': '#string-escapes'
           }
         ]
       }
     ]
-  'condition-string-escapes':
+  'string-escapes':
     'patterns': [
       {
-        'match': '\\\\[0-9a-fA-F]{1,6}'
+        # Keep the string open when a newline terminates a hex escape.
+        'begin': '\\\\[0-9a-fA-F]{1,6}$\\s*'
+        'end': '^'
+        'name': 'constant.character.escape.codepoint.css'
+      }
+      {
+        # A hex escape consumes one whitespace character, including a newline.
+        'match': '\\\\[0-9a-fA-F]{1,6}(?:\\r\\n|[\\x20\\t\\r\\n\\f])?'
         'name': 'constant.character.escape.codepoint.css'
       }
       {
         # Unlike the shared ^(?<!\\G), ^ releases the escape at the start
-        # of the next line even while the enclosing condition is open.
+        # of the next line even while the enclosing string is open.
         'begin': '\\\\$\\s*'
         'end': '^'
         'name': 'constant.character.escape.newline.css'
@@ -1293,8 +1300,6 @@
       }
     ]
   'functional-pseudo-classes':
-    # Recover only at unescaped block openers outside nested strings,
-    # comments and selectors; these arguments cannot contain raw blocks.
     'patterns': [
       {
         # Text direction
@@ -1306,9 +1311,9 @@
             'name': 'punctuation.definition.entity.css'
           '3':
             'name': 'punctuation.section.function.begin.bracket.round.css'
-        'end': '(\\))|(?=\\{)'
+        'end': '\\)'
         'endCaptures':
-          '1':
+          '0':
             'name': 'punctuation.section.function.end.bracket.round.css'
         'patterns': [
           {
@@ -1336,9 +1341,9 @@
             'name': 'punctuation.definition.entity.css'
           '3':
             'name': 'punctuation.section.function.begin.bracket.round.css'
-        'end': '(\\))|(?=\\{)'
+        'end': '\\)'
         'endCaptures':
-          '1':
+          '0':
             'name': 'punctuation.section.function.end.bracket.round.css'
         'patterns': [
           {
@@ -1357,7 +1362,7 @@
             'name': 'string.quoted.double.css'
             'patterns': [
               {
-                'include': '#escapes'
+                'include': '#string-escapes'
               }
               {
                 'match': '(?<=["\\s])[a-zA-Z*]+(-[a-zA-Z0-9*]*)*(?=["\\s])'
@@ -1377,7 +1382,7 @@
             'name': 'string.quoted.single.css'
             'patterns': [
               {
-                'include': '#escapes'
+                'include': '#string-escapes'
               }
               {
                 'match': "(?<=['\\s])[a-zA-Z*]+(-[a-zA-Z0-9*]*)*(?=['\\s])"
@@ -1400,9 +1405,9 @@
             'name': 'punctuation.definition.entity.css'
           '3':
             'name': 'punctuation.section.function.begin.bracket.round.css'
-        'end': '(\\))|(?=\\{)'
+        'end': '\\)'
         'endCaptures':
-          '1':
+          '0':
             'name': 'punctuation.section.function.end.bracket.round.css'
         'patterns': [
           {
@@ -1420,9 +1425,9 @@
             'name': 'punctuation.definition.entity.css'
           '3':
             'name': 'punctuation.section.function.begin.bracket.round.css'
-        'end': '(\\))|(?=\\{)'
+        'end': '\\)'
         'endCaptures':
-          '1':
+          '0':
             'name': 'punctuation.section.function.end.bracket.round.css'
         'patterns': [
           {
