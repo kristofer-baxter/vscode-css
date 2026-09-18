@@ -3865,6 +3865,40 @@ describe('CSS grammar', function () {
 		});
 	});
 	describe('bounded recovery and condition strings', function () {
+		it('preserves the three custom-property declarations from the review', function () {
+			var source = [
+				'a {',
+				'  --x: calc({foo});',
+				'  --y: rgb({foo});',
+				'  --z: var(--fallback, calc({foo}));',
+				'}',
+				'.after { color: red; }'
+			].join('\n');
+			var lines = testGrammar.tokenizeLines(source);
+			var base = ['source.css', 'meta.property-list.css', 'meta.property-value.css'];
+			[
+				['meta.function.calc.css'],
+				['meta.function.color.css'],
+				['meta.function.variable.css', 'meta.function.calc.css']
+			].forEach(function (scopes, index) {
+				var tokens = lines[index + 1];
+				var expected = base.concat(scopes);
+				assert.deepStrictEqual(tokens.find(t => t.value === 'foo').scopes, expected);
+				assert.deepStrictEqual(tokens.find(t => t.value === '{').scopes,
+					expected.concat('punctuation.section.group.begin.bracket.curly.css'));
+				assert.deepStrictEqual(tokens.find(t => t.value === '}').scopes,
+					expected.concat('punctuation.section.group.end.bracket.curly.css'));
+				assert.deepStrictEqual(tokens.filter(t => t.value === ')').map(t => t.scopes),
+					scopes.map((_, i) => base.concat(scopes.slice(0, scopes.length - i),
+						'punctuation.section.function.end.bracket.round.css')));
+				assert.deepStrictEqual(tokens.find(t => t.value === ';').scopes,
+					['source.css', 'meta.property-list.css', 'punctuation.terminator.rule.css']);
+			});
+			assert.deepStrictEqual(lines[5].find(t => t.value === 'after').scopes,
+				['source.css', 'meta.selector.css', 'entity.other.attribute-name.class.css']);
+			assert.deepStrictEqual(testGrammar.scopeStackAtEnd(source), ['source.css']);
+		});
+
 		it('preserves balanced blocks in shared value functions', function () {
 			var base = ['source.css', 'meta.property-list.css', 'meta.property-value.css'];
 			[
@@ -3884,16 +3918,19 @@ describe('CSS grammar', function () {
 				['{foo}', '{\n  {foo}\n}'].forEach(function (block) {
 					[
 						['--x: ', '', []],
+						['--x: var(--fallback, ', ')', ['meta.function.variable.css']],
 						['color: var(--fallback, ', ')', ['meta.function.variable.css']],
 						['--x: --custom(', ')', ['meta.function.custom.css']],
-						['--x: attr(data-x, ', ')', ['meta.function.misc.css']]
+						['--x: attr(data-x, ', ')', ['meta.function.misc.css']],
+						['--x: if(style(--flag: on): ', ')', ['meta.function.misc.css']]
 					].forEach(function ([prefix, suffix, outerScopes]) {
 						var source = 'a { ' + prefix + name + '(' + block + ')' + suffix + '; }\n.after { color: red; }';
 						var lines = testGrammar.tokenizeLines(source);
 						var tokens = lines.slice(0, -1).flat();
 						var expected = base.concat(outerScopes, scopes);
 						assert.deepStrictEqual(tokens.find(t => t.value === 'foo').scopes, expected, source);
-						assert.deepStrictEqual(tokens.find(t => t.value === ')').scopes,
+						var closingIndex = tokens.findIndex(t => t.value === 'foo');
+						assert.deepStrictEqual(tokens.slice(closingIndex).find(t => t.value === ')').scopes,
 							expected.concat('punctuation.section.function.end.bracket.round.css'), source);
 						assert.deepStrictEqual(lines.at(-1).find(t => t.value === 'after').scopes,
 							['source.css', 'meta.selector.css', 'entity.other.attribute-name.class.css'], source);
@@ -3925,29 +3962,66 @@ describe('CSS grammar', function () {
 			});
 		});
 
-		it('preserves nested and multiline blocks in general-enclosed media conditions', function () {
+		[
+			['media', '@media (future: ', [], 'punctuation.definition.parameters.end.bracket.round.css'],
+			['supports', '@supports (future ', ['meta.feature-query.css'], 'punctuation.definition.condition.end.bracket.round.css']
+		].forEach(function ([rule, prefix, conditionScopes, closingScope]) {
+			it('preserves nested and multiline blocks in general-enclosed ' + rule + ' conditions', function () {
+				[
+					'{foo}',
+					'{{foo}}',
+					'{\n  foo\n}',
+					'{\n  {foo}\n}',
+					'{ "{" }',
+					'{ "}" }',
+					"{ '{' }",
+					"{ '}' }",
+					'{ "a\\"{b" }',
+					'{ /* { */ foo }',
+					'{ "a\\\nb{" }',
+					"{ 'a\\\nb{' }"
+				].forEach(function (value) {
+					var source = prefix + value + ') {\n.after { color: red; }\n}';
+					var lines = testGrammar.tokenizeLines(source);
+					var prelude = lines.slice(0, -2).flat();
+					var bodyScope = 'meta.at-rule.' + rule + '.body.css';
+					var headerScope = 'meta.at-rule.' + rule + '.header.css';
+					var braceScope = 'punctuation.section.' + rule + '.begin.bracket.curly.css';
+					var bodyBraces = prelude.filter(t => t.scopes.includes(braceScope));
+					assert.equal(bodyBraces.length, 1, source);
+					assert.deepStrictEqual(bodyBraces[0], {
+						scopes: ['source.css', bodyScope, braceScope],
+						value: '{'
+					}, source);
+					assert.equal(prelude.indexOf(bodyBraces[0]), prelude.length - 1, source);
+					assert.deepStrictEqual(prelude.find(t => t.value === ')').scopes,
+						['source.css', headerScope].concat(conditionScopes, closingScope), source);
+					assert.deepStrictEqual(lines.at(-2).find(t => t.value === 'after').scopes,
+						['source.css', bodyScope, 'meta.selector.css', 'entity.other.attribute-name.class.css'], source);
+					assert.deepStrictEqual(testGrammar.scopeStackAtEnd(source), ['source.css'], source);
+				});
+			});
+		});
+
+		it('preserves recognized functions inside general-enclosed media conditions', function () {
 			[
-				'{foo}',
-				'{{foo}}',
-				'{\n  foo\n}',
-				'{\n  {foo}\n}',
-				'{ "{" }',
-				'{ "}" }',
-				'{ /* { */ foo }',
-				'{ "a\\\nb{" }'
-			].forEach(function (value) {
+				['calc({foo})', ['meta.function.calc.css']],
+				['rgb({\nfoo\n})', ['meta.function.color.css']],
+				['var(--fallback, calc({foo}))', ['meta.function.variable.css', 'meta.function.calc.css']]
+			].forEach(function ([value, scopes]) {
 				var source = '@media (future: ' + value + ') {\n.after { color: red; }\n}';
 				var lines = testGrammar.tokenizeLines(source);
 				var prelude = lines.slice(0, -2).flat();
-				var bodyBraces = prelude.filter(t => t.scopes.includes('punctuation.section.media.begin.bracket.curly.css'));
-				assert.equal(bodyBraces.length, 1, source);
-				assert.deepStrictEqual(bodyBraces[0], {
-					scopes: ['source.css', 'meta.at-rule.media.body.css', 'punctuation.section.media.begin.bracket.curly.css'],
-					value: '{'
-				}, source);
-				assert.equal(prelude.indexOf(bodyBraces[0]), prelude.length - 1, source);
-				assert.deepStrictEqual(prelude.find(t => t.value === ')').scopes,
-					['source.css', 'meta.at-rule.media.header.css', 'punctuation.definition.parameters.end.bracket.round.css'], source);
+				var base = ['source.css', 'meta.at-rule.media.header.css'];
+				assert.deepStrictEqual(prelude.find(t => t.value === 'foo').scopes, base.concat(scopes), source);
+				var closes = prelude.filter(t => t.value === ')');
+				assert.equal(closes.length, scopes.length + 1, source);
+				scopes.forEach(function (_, i) {
+					assert.deepStrictEqual(closes[i].scopes, base.concat(scopes.slice(0, scopes.length - i),
+						'punctuation.section.function.end.bracket.round.css'), source);
+				});
+				assert.deepStrictEqual(closes.at(-1).scopes,
+					base.concat('punctuation.definition.parameters.end.bracket.round.css'), source);
 				assert.deepStrictEqual(lines.at(-2).find(t => t.value === 'after').scopes,
 					['source.css', 'meta.at-rule.media.body.css', 'meta.selector.css', 'entity.other.attribute-name.class.css'], source);
 				assert.deepStrictEqual(testGrammar.scopeStackAtEnd(source), ['source.css'], source);
@@ -3959,6 +4033,20 @@ describe('CSS grammar', function () {
 			lines[1].forEach(function (token) {
 				assert.ok(token.scopes.includes('meta.at-rule.media.header.css'), JSON.stringify(token));
 				assert.ok(!token.scopes.includes('meta.at-rule.media.body.css'), JSON.stringify(token));
+			});
+		});
+
+		it('does not recover shared value functions at a block opener', function () {
+			[
+				['a { width: calc(1px{', 'meta.function.calc.css'],
+				['a { width: calc((1px{', 'meta.function.calc.css'],
+				['a { color: rgb(0 0 0{', 'meta.function.color.css'],
+				['a { background: linear-gradient(red{', 'meta.function.gradient.css']
+			].forEach(function ([source, scope]) {
+				var lines = testGrammar.tokenizeLines(source + '\n.after { color: red; }');
+				lines[1].forEach(function (token) {
+					assert.ok(token.scopes.includes(scope), source + ' -> ' + JSON.stringify(token));
+				});
 			});
 		});
 
@@ -4022,7 +4110,9 @@ describe('CSS grammar', function () {
 				['@media (future: "a{b") {', 'meta.at-rule.media.header.css'],
 				["@media (future: 'a{b') {", 'meta.at-rule.media.header.css'],
 				['@media (future: "a)b{") {', 'meta.at-rule.media.header.css'],
-				['@supports (future "a{b") {', 'meta.at-rule.supports.header.css']
+				['@supports (future "a{b") {', 'meta.at-rule.supports.header.css'],
+				["@supports (future 'a{b') {", 'meta.at-rule.supports.header.css'],
+				['@supports (future "a)b{") {', 'meta.at-rule.supports.header.css']
 			].forEach(function (pair) {
 				var line = pair[0], header = pair[1];
 				var tokens = testGrammar.tokenizeLine(line).tokens;
@@ -4049,6 +4139,10 @@ describe('CSS grammar', function () {
 				"@supports (future 'a{\\\n b') {\n.after { color: red; }\n}"
 			].forEach(function (src) {
 				var lines = testGrammar.tokenizeLines(src);
+				assert.equal(lines[0].at(-1).value, '\\', src);
+				assert.equal(lines[0].at(-1).scopes.at(-1), 'constant.character.escape.newline.css', src);
+				assert.ok(lines[1][0].scopes.some(s => s.startsWith('string.quoted.')), src);
+				assert.ok(!lines[1][0].scopes.includes('constant.character.escape.newline.css'), src);
 				var last = lines.at(-2);
 				var colour = last.find(function (t) { return t.value === 'color'; });
 				assert.ok(colour, src + ' -> no `color` token on the trailing rule');
