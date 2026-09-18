@@ -711,6 +711,7 @@
             'name': 'support.function.layer.css'
           '2':
             'name': 'punctuation.section.function.begin.bracket.round.css'
+        # Layer names cannot contain an unescaped block opener.
         'end': '(\\))|(?=\\{)'
         'endCaptures':
           '1':
@@ -853,12 +854,8 @@
         'name': 'constant.character.escape.css'
       }
     ]
-  # A string inside an at-rule condition. Identical to `#string` except
-  # that it does not enter the multi-line newline-escape region: a
-  # condition region's `end` cannot be tested while that region is
-  # active, so a legal `"a{\` continuation would hold the prelude open
-  # for the rest of the stylesheet. Without it, a trailing backslash
-  # simply leaves the string open to its real closing quote.
+  # Condition strings use a local newline escape so a line continuation
+  # releases at the next line without changing other string contexts.
   'condition-string':
     'patterns': [
       {
@@ -901,12 +898,8 @@
         'name': 'constant.character.escape.codepoint.css'
       }
       {
-        # A local copy of the newline escape in `#escapes`. It differs only
-        # in its `end`: the shared rule uses `^(?<!\\G)`, which cannot match
-        # while an at-rule condition is still open, so the region swallowed
-        # the rest of the stylesheet. A bare `^` always closes it at the
-        # start of the next line, which is the only behaviour a line
-        # continuation needs.
+        # Unlike the shared ^(?<!\\G), ^ releases the escape at the start
+        # of the next line even while the enclosing condition is open.
         'begin': '\\\\$\\s*'
         'end': '^'
         'name': 'constant.character.escape.newline.css'
@@ -995,6 +988,9 @@
       }
     ]
   'functions':
+    # Shared with custom properties and declaration-value arguments, where
+    # even recognized functions can contain balanced blocks. Do not recover
+    # at `{` here or in function-nesting.
     'patterns': [
       # Calculation
       {
@@ -1004,9 +1000,9 @@
             'name': 'support.function.calc.css'
           '2':
             'name': 'punctuation.section.function.begin.bracket.round.css'
-        'end': '(\\))|(?=\\{)'
+        'end': '\\)'
         'endCaptures':
-          '1':
+          '0':
             'name': 'punctuation.section.function.end.bracket.round.css'
         'name': 'meta.function.calc.css'
         'patterns': [
@@ -1029,9 +1025,9 @@
             'name': 'support.function.misc.css'
           '2':
             'name': 'punctuation.section.function.begin.bracket.round.css'
-        'end': '(\\))|(?=\\{)'
+        'end': '\\)'
         'endCaptures':
-          '1':
+          '0':
             'name': 'punctuation.section.function.end.bracket.round.css'
         'name': 'meta.function.color.css'
         'patterns': [
@@ -1056,9 +1052,9 @@
             'name': 'support.function.gradient.css'
           '2':
             'name': 'punctuation.section.function.begin.bracket.round.css'
-        'end': '(\\))|(?=\\{)'
+        'end': '\\)'
         'endCaptures':
-          '1':
+          '0':
             'name': 'punctuation.section.function.end.bracket.round.css'
         'name': 'meta.function.gradient.css'
         'patterns': [
@@ -1079,9 +1075,9 @@
             'name': 'invalid.deprecated.gradient.function.css'
           '2':
             'name': 'punctuation.section.function.begin.bracket.round.css'
-        'end': '(\\))|(?=\\{)'
+        'end': '\\)'
         'endCaptures':
-          '1':
+          '0':
             'name': 'punctuation.section.function.end.bracket.round.css'
         'name': 'meta.function.gradient.invalid.deprecated.gradient.css'
         'patterns': [
@@ -1092,9 +1088,9 @@
                 'name': 'invalid.deprecated.function.css'
               '2':
                 'name': 'punctuation.section.function.begin.bracket.round.css'
-            'end': '(\\))|(?=\\{)'
+            'end': '\\)'
             'endCaptures':
-              '1':
+              '0':
                 'name': 'punctuation.section.function.end.bracket.round.css'
             'patterns': [
               {
@@ -1108,11 +1104,15 @@
         ]
       }
       # Misc functions
-      # attr(), if(), style() and toggle() take <declaration-value>, which may
-      # legally contain a balanced curly block, so they keep the unguarded
-      # ending and stay scoped exactly as they are today.
       {
-        'begin': '(?i)(?<![\\w-])(attr|if|style|cycle)(\\()'
+        'begin': '''(?xi) (?<![\\w-])
+          (annotation|attr|blur|brightness|character-variant|clamp|contrast|counters?
+          |cross-fade|drop-shadow|element|fit-content|format|grayscale|hue-rotate|color-mix
+          |image-set|invert|local|max|min|minmax|opacity|ornaments|repeat|saturate|sepia
+          |styleset|stylistic|swash|symbols
+          |cos|sin|tan|acos|asin|atan|atan2|hypot|sqrt|pow|log|exp|abs|sign|if|style)
+          (\\()
+        '''
         'beginCaptures':
           '1':
             'name': 'support.function.misc.css'
@@ -1140,42 +1140,6 @@
           }
         ]
       }
-      {
-        'begin': '''(?xi) (?<![\\w-])
-          (annotation|blur|brightness|character-variant|clamp|contrast|counters?
-          |cross-fade|drop-shadow|element|fit-content|format|grayscale|hue-rotate|color-mix
-          |image-set|invert|local|max|min|minmax|opacity|ornaments|repeat|saturate|sepia
-          |styleset|stylistic|swash|symbols
-          |cos|sin|tan|acos|asin|atan|atan2|hypot|sqrt|pow|log|exp|abs|sign|if|style)
-          (\\()
-        '''
-        'beginCaptures':
-          '1':
-            'name': 'support.function.misc.css'
-          '2':
-            'name': 'punctuation.section.function.begin.bracket.round.css'
-        'end': '(\\))|(?=\\{)'
-        'endCaptures':
-          '1':
-            'name': 'punctuation.section.function.end.bracket.round.css'
-        'name': 'meta.function.misc.css'
-        'patterns': [
-          {
-            'match': '(?i)(?<=[,\\s"]|\\*/|^)\\d+x(?=[\\s,"\')]|/\\*|$)'
-            'name': 'constant.numeric.other.density.css'
-          }
-          {
-            'include': '#arithmetic-operators'
-          }
-          {
-            'include': '#property-values'
-          }
-          {
-            'match': '[^\'"),\\s]+'
-            'name': 'variable.parameter.misc.css'
-          }
-        ]
-      }
       # Shapes
       {
         'begin': '(?i)(?<![\\w-])(circle|ellipse|inset|polygon|rect)(\\()'
@@ -1184,9 +1148,9 @@
             'name': 'support.function.shape.css'
           '2':
             'name': 'punctuation.section.function.begin.bracket.round.css'
-        'end': '(\\))|(?=\\{)'
+        'end': '\\)'
         'endCaptures':
-          '1':
+          '0':
             'name': 'punctuation.section.function.end.bracket.round.css'
         'name': 'meta.function.shape.css'
         'patterns': [
@@ -1207,9 +1171,9 @@
             'name': 'support.function.timing-function.css'
           '2':
             'name': 'punctuation.section.function.begin.bracket.round.css'
-        'end': '(\\))|(?=\\{)'
+        'end': '\\)'
         'endCaptures':
-          '1':
+          '0':
             'name': 'punctuation.section.function.end.bracket.round.css'
         'name': 'meta.function.timing-function.css'
         'patterns': [
@@ -1237,9 +1201,9 @@
             'name': 'support.function.transform.css'
           '2':
             'name': 'punctuation.section.function.begin.bracket.round.css'
-        'end': '(\\))|(?=\\{)'
+        'end': '\\)'
         'endCaptures':
-          '1':
+          '0':
             'name': 'punctuation.section.function.end.bracket.round.css'
         'patterns': [
           {
@@ -1267,14 +1231,9 @@
             'name': 'support.function.custom.css'
           '2':
             'name': 'punctuation.section.function.begin.bracket.round.css'
-        # Not guarded, for the same reason as `var()`: a custom function call is
-        # a declaration value, and `<declaration-value>` admits a balanced curly
-        # block that legally spans lines, as in `--x: --foo({ ... });`. The legal
-        # `--foo({` and the malformed `--foo(a{` are indistinguishable within a
-        # single line, so recovering here would cost legal CSS.
-        'end': '(\\))'
+        'end': '\\)'
         'endCaptures':
-          '1':
+          '0':
             'name': 'punctuation.section.function.end.bracket.round.css'
         'name': 'meta.function.custom.css'
         'patterns': [
@@ -1291,12 +1250,9 @@
             'name': 'support.function.misc.css'
           '2':
             'name': 'punctuation.section.function.begin.bracket.round.css'
-        # No `{` bail-out here: a `var()` fallback may legally contain a
-        # balanced curly block spanning lines (`var(--x, { color: red })`),
-        # and `main` already recovers an unclosed `var(` no better than this.
-        'end': '(\\))'
+        'end': '\\)'
         'endCaptures':
-          '1':
+          '0':
             'name': 'punctuation.section.function.end.bracket.round.css'
         'name': 'meta.function.variable.css'
         'patterns': [
@@ -1321,9 +1277,9 @@
     'beginCaptures':
       '0':
         'name': 'punctuation.definition.function.begin.bracket.round.css'
-    'end': '(\\))|(?=\\{)'
+    'end': '\\)'
     'endCaptures':
-      '1':
+      '0':
         'name': 'punctuation.definition.function.end.bracket.round.css'
     'patterns': [
       {
@@ -1337,6 +1293,8 @@
       }
     ]
   'functional-pseudo-classes':
+    # Recover only at unescaped block openers outside nested strings,
+    # comments and selectors; these arguments cannot contain raw blocks.
     'patterns': [
       {
         # Text direction
@@ -1454,32 +1412,7 @@
       }
       {
         # Child-indexed
-        'begin': '(?i)((:)nth-(?:last-)?child)(\\()'
-        'beginCaptures':
-          '1':
-            'name': 'entity.other.attribute-name.pseudo-class.css'
-          '2':
-            'name': 'punctuation.definition.entity.css'
-          '3':
-            'name': 'punctuation.section.function.begin.bracket.round.css'
-        'end': '(\\))|(?=\\{)'
-        'endCaptures':
-          '1':
-            'name': 'punctuation.section.function.end.bracket.round.css'
-        'patterns': [
-          {
-            'match': '(?i)[+-]?(\\d+n?|n)(\\s*[+-]\\s*\\d+)?'
-            'name': 'constant.numeric.css'
-          }
-          {
-            'match': '(?i)even|odd'
-            'name': 'support.constant.parity.css'
-          }
-        ]
-      }
-      {
-        # Typed-child-indexed; :nth-of-type() takes no `of` clause
-        'begin': '(?i)((:)nth-(?:last-)?of-type)(\\()'
+        'begin': '(?i)((:)nth-(?:last-)?(?:child|of-type))(\\()'
         'beginCaptures':
           '1':
             'name': 'entity.other.attribute-name.pseudo-class.css'
@@ -1627,14 +1560,11 @@
         'beginCaptures':
           '0':
             'name': 'punctuation.definition.parameters.begin.bracket.round.css'
-        # Bail out at a `{` that is not closed before the next brace: a
-        # balanced block is legal here as `<general-enclosed>` and stays, an
-        # unclosed one is not. Testing for a balanced block rather than for a
-        # `)` further along the line keeps this from re-scanning the tail at
-        # every brace.
-        'end': '(\\))|(?=\\{(?![^{}]*\\}))'
+        # General-enclosed values may contain nested and multiline blocks.
+        # A line-local brace guard cannot distinguish them from a rule body.
+        'end': '\\)'
         'endCaptures':
-          '1':
+          '0':
             'name': 'punctuation.definition.parameters.end.bracket.round.css'
         'patterns': [
           {
