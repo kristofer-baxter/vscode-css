@@ -1099,7 +1099,15 @@
             'include': '#property-values'
           }
           {
-            'match': '(?:[^\\\\\'"),/\\s]|/(?!\\*))+'
+            # Keep escaped identifier suffixes from matching as functions.
+            'captures':
+              '0':
+                'patterns': [
+                  {
+                    'include': '#escapes'
+                  }
+                ]
+            'match': '(?:[^\\\\\'"),/{\\s]|/(?!\\*)|\\\\(?:[0-9a-fA-F]{1,6}[\\x20\\t\\f]?|[^\\r\\n\\f]))+'
             'name': 'variable.parameter.misc.css'
           }
         ]
@@ -1318,7 +1326,7 @@
             'beginCaptures':
               '0':
                 'name': 'punctuation.definition.string.begin.css'
-            'end': '"|(?<!\\\\)(?=$|\\n)'
+            'end': '"|(?=\\f)|(?<!\\\\)(?=$|\\n)'
             'endCaptures':
               '0':
                 'name': 'punctuation.definition.string.end.css'
@@ -1338,7 +1346,7 @@
             'beginCaptures':
               '0':
                 'name': 'punctuation.definition.string.begin.css'
-            'end': "'|(?<!\\\\)(?=$|\\n)"
+            'end': "'|(?=\\f)|(?<!\\\\)(?=$|\\n)"
             'endCaptures':
               '0':
                 'name': 'punctuation.definition.string.end.css'
@@ -2447,21 +2455,22 @@
       }
     ]
   'string':
+    # Atomic escapes keep their terminating whitespace out of bad-string diagnostics.
     'patterns': [
       {
         'begin': '"'
         'beginCaptures':
           '0':
             'name': 'punctuation.definition.string.begin.css'
-        'end': '"|(?<!\\\\)(?=$|\\n)'
+        'end': '"|(?=\\f)|(?<!\\\\)(?=$|\\n)'
         'endCaptures':
           '0':
             'name': 'punctuation.definition.string.end.css'
         'name': 'string.quoted.double.css'
         'patterns': [
           {
-            'begin': '(?:\\G|^)(?!(?:[^\\\\"]|\\\\.)*\\\\[0-9a-fA-F]{1,6}$)(?=(?:[^\\\\"]|\\\\.)+$)'
-            'end': '$'
+            'begin': '(?:\\G|^)(?=(?>[^\\\\"\\f\\n]|\\\\(?:[0-9a-fA-F]{1,6}[\\x20\\t\\f\\n]?|[^\\n]))+[\\f\\n])'
+            'end': '(?=[\\f\\n])'
             'name': 'invalid.illegal.unclosed.string.css'
             'patterns': [
               {
@@ -2479,15 +2488,15 @@
         'beginCaptures':
           '0':
             'name': 'punctuation.definition.string.begin.css'
-        'end': "'|(?<!\\\\)(?=$|\\n)"
+        'end': "'|(?=\\f)|(?<!\\\\)(?=$|\\n)"
         'endCaptures':
           '0':
             'name': 'punctuation.definition.string.end.css'
         'name': 'string.quoted.single.css'
         'patterns': [
           {
-            'begin': "(?:\\G|^)(?!(?:[^\\\\']|\\\\.)*\\\\[0-9a-fA-F]{1,6}$)(?=(?:[^\\\\']|\\\\.)+$)"
-            'end': '$'
+            'begin': "(?:\\G|^)(?=(?>[^\\\\'\\f\\n]|\\\\(?:[0-9a-fA-F]{1,6}[\\x20\\t\\f\\n]?|[^\\n]))+[\\f\\n])"
+            'end': '(?=[\\f\\n])'
             'name': 'invalid.illegal.unclosed.string.css'
             'patterns': [
               {
